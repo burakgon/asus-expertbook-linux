@@ -29,7 +29,7 @@
 
 MODULE_NAME="audio-fix"
 MODULE_DESC="ASUS ExpertBook Ultra (B9406CAA) cs35l56 speaker firmware + UCM + WP profile"
-MODULE_VERSION="1.2.0"
+MODULE_VERSION="1.3.0"
 
 MODULE_FILES=(
   "cs35l56-b0-dsp1-misc-104315e4-l2u0.bin:/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u0.bin"
