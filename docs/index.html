@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+
+<title>ASUS ExpertBook Ultra (B9406CAA) on Linux — Touchpad, Wi-Fi 7 BE211, Cirrus CS35L56 fixes</title>
+<meta name="description" content="Working Linux compatibility fixes for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake). Patches for the PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, ALSA UCM, and Intel Wi-Fi 7 BE211 stability — packaged as a tracked, versioned patcher.">
+<meta name="keywords" content="ASUS ExpertBook Ultra, B9406CAA, Linux, Wi-Fi 7 BE211, Cirrus CS35L56, PixArt 4F05, ASCP1D80, Panther Lake, iwlmld, sof-soundwire, cs42l43, ALSA UCM, libinput quirk, haptic touchpad, kernel firmware">
+<link rel="canonical" href="https://burakgon.github.io/asus-expertbook-linux/">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="ASUS ExpertBook Ultra (B9406CAA) on Linux">
+<meta property="og:description" content="Touchpad, Wi-Fi 7 BE211, and Cirrus CS35L56 speaker fixes for the 2026 ASUS ExpertBook Ultra — packaged as a tracked, versioned patcher.">
+<meta property="og:url" content="https://burakgon.github.io/asus-expertbook-linux/">
+<meta property="og:site_name" content="asus-expertbook-linux">
+<meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — patcher with three modules: touchpad-fix, audio-fix, wifi-fix">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ASUS ExpertBook Ultra (B9406CAA) on Linux">
+<meta name="twitter:description" content="Touchpad, Wi-Fi 7 BE211, and Cirrus CS35L56 speaker fixes — versioned patcher.">
+<meta name="twitter:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
+
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "asus-expertbook-linux",
+  "alternateName": "ASUS ExpertBook Ultra B9406CAA Linux fixes",
+  "applicationCategory": "Driver",
+  "operatingSystem": "Linux",
+  "description": "Linux compatibility patches for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake): PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, ALSA UCM, and Intel Wi-Fi 7 BE211 stability tweaks. Packaged as a tracked, versioned patcher.",
+  "softwareVersion": "1.x",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "url": "https://burakgon.github.io/asus-expertbook-linux/",
+  "downloadUrl": "https://github.com/burakgon/asus-expertbook-linux",
+  "license": "https://opensource.org/license/mit/",
+  "author": { "@type": "Person", "name": "burakgon" }
+}
+</script>
+
+<style>
+  :root {
+    --bg: #0b0d10;
+    --bg-elev: #11151a;
+    --bg-elev-2: #161b22;
+    --border: #232a33;
+    --border-strong: #2f3a47;
+    --fg: #e8eef5;
+    --fg-muted: #8a96a3;
+    --fg-dim: #5f6b78;
+    --accent: #7dd3fc;
+    --accent-2: #c4b5fd;
+    --warn: #fbbf24;
+    --ok: #86efac;
+    --code-bg: #0a0d11;
+    --hero-grad: radial-gradient(1200px 600px at 70% -10%, rgba(125,211,252,0.10), transparent 60%),
+                 radial-gradient(900px 500px at 10% 0%, rgba(196,181,253,0.07), transparent 60%);
+    --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 30px rgba(0,0,0,0.45);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff;
+      --bg-elev: #f7f9fc;
+      --bg-elev-2: #ffffff;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --fg: #0f172a;
+      --fg-muted: #475569;
+      --fg-dim: #94a3b8;
+      --accent: #0369a1;
+      --accent-2: #6d28d9;
+      --warn: #b45309;
+      --ok: #15803d;
+      --code-bg: #f1f5f9;
+      --hero-grad: radial-gradient(1200px 600px at 70% -10%, rgba(3,105,161,0.10), transparent 60%),
+                   radial-gradient(900px 500px at 10% 0%, rgba(109,40,217,0.07), transparent 60%);
+      --shadow: 0 1px 0 rgba(0,0,0,0.02) inset, 0 8px 30px rgba(15,23,42,0.06);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    background-image: var(--hero-grad);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  code, kbd, pre, .mono {
+    font: 0.92em/1.55 ui-monospace, "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+  }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: none; padding: 0; }
+
+  /* Layout */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    background: color-mix(in oklab, var(--bg) 75%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-row {
+    display: flex; align-items: center; gap: 24px;
+    padding: 14px 0;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand .dot {
+    width: 10px; height: 10px; border-radius: 999px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+  nav.links { margin-left: auto; display: flex; gap: 18px; font-size: 0.94rem; }
+  nav.links a { color: var(--fg-muted); }
+  nav.links a:hover { color: var(--fg); text-decoration: none; }
+  .gh-cta {
+    color: var(--fg) !important;
+    border: 1px solid var(--border-strong);
+    padding: 6px 12px; border-radius: 8px;
+    background: var(--bg-elev);
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .gh-cta:hover { border-color: var(--accent); transform: translateY(-1px); text-decoration: none; }
+
+  /* Hero */
+  .hero { padding: 84px 0 56px; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    padding: 4px 10px; border-radius: 999px;
+    margin-bottom: 22px;
+  }
+  h1 {
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    line-height: 1.1; margin: 0 0 18px;
+    letter-spacing: -0.025em; font-weight: 700;
+    background: linear-gradient(180deg, var(--fg), color-mix(in oklab, var(--fg) 70%, var(--accent)));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede {
+    font-size: clamp(1.05rem, 1.5vw, 1.2rem);
+    color: var(--fg-muted);
+    max-width: 60ch;
+    margin: 0 0 28px;
+  }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 18px; border-radius: 10px;
+    font-weight: 600; font-size: 0.95rem;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    color: var(--fg);
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); border-color: var(--accent); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0b0d10; border-color: transparent;
+  }
+  .btn-primary:hover { color: #0b0d10; border-color: transparent; }
+
+  .hero-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; color: var(--fg-dim); font-size: 0.88rem; }
+  .hero-meta span::before { content: "·"; margin-right: 16px; color: var(--fg-dim); }
+  .hero-meta span:first-child::before { content: ""; margin: 0; }
+
+  /* Sections */
+  section { padding: 60px 0; border-top: 1px solid var(--border); }
+  section h2 {
+    font-size: clamp(1.6rem, 3vw, 2rem); letter-spacing: -0.02em;
+    margin: 0 0 12px;
+  }
+  section .sub { color: var(--fg-muted); margin: 0 0 32px; max-width: 70ch; }
+
+  /* Card grid */
+  .grid { display: grid; gap: 16px; }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+  .card:hover::before { opacity: 0.7; }
+  .card h3 { margin: 0 0 8px; font-size: 1.12rem; letter-spacing: -0.01em; }
+  .card .ver { color: var(--fg-dim); font-size: 0.82rem; margin-left: 8px; font-weight: 500; }
+  .card p { margin: 0 0 12px; color: var(--fg-muted); font-size: 0.95rem; }
+  .card ul { margin: 8px 0 0; padding-left: 18px; color: var(--fg-muted); font-size: 0.92rem; }
+  .card ul li { margin: 4px 0; }
+  .badge {
+    display: inline-block; font-size: 0.72rem;
+    padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border-strong); color: var(--fg-muted);
+    margin-right: 6px; margin-bottom: 6px;
+  }
+  .badge.ok { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 30%, var(--border)); }
+  .badge.warn { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 30%, var(--border)); }
+
+  /* Hardware specs */
+  dl.specs {
+    display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px;
+    margin: 0; padding: 0;
+  }
+  dl.specs dt { color: var(--fg-muted); font-size: 0.9rem; }
+  dl.specs dd { margin: 0; font-size: 0.95rem; }
+  dl.specs dd .mono { color: var(--accent); }
+
+  /* Install steps */
+  ol.steps { padding-left: 20px; }
+  ol.steps li { margin: 12px 0; }
+  ol.steps li::marker { color: var(--accent); font-weight: 700; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--fg-muted); font-weight: 600; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  td .mono { color: var(--accent); }
+
+  /* Details / FAQ */
+  details {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 10px 0;
+  }
+  details + details { margin-top: 8px; }
+  details[open] { border-color: var(--border-strong); }
+  details summary {
+    cursor: pointer; font-weight: 600; list-style: none;
+    display: flex; align-items: center; gap: 10px;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: "+"; color: var(--accent); font-family: ui-monospace, monospace;
+    font-weight: 600; font-size: 1.2rem; transition: transform .2s ease;
+    display: inline-block; width: 14px;
+  }
+  details[open] summary::before { content: "−"; }
+  details p, details pre { color: var(--fg-muted); margin: 12px 0 4px; }
+  details pre { color: var(--fg); }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0 64px;
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+  }
+  footer a { color: var(--fg-muted); }
+  .foot-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: baseline; justify-content: space-between; }
+
+  /* Subtle animations */
+  @media (prefers-reduced-motion: no-preference) {
+    .card, .btn { will-change: transform; }
+    .hero h1 { animation: rise .6s ease-out both; }
+    .hero .lede { animation: rise .6s .08s ease-out both; }
+    .hero .hero-cta { animation: rise .6s .14s ease-out both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  }
+
+  /* Tiny screens */
+  @media (max-width: 540px) {
+    nav.links a:not(.gh-cta) { display: none; }
+    .hero { padding-top: 56px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-row">
+    <a href="#top" class="brand"><span class="dot"></span> asus-expertbook-linux</a>
+    <nav class="links">
+      <a href="#fixes">Fixes</a>
+      <a href="#install">Install</a>
+      <a href="#modules">Modules</a>
+      <a href="#faq">FAQ</a>
+      <a class="gh-cta" href="https://github.com/burakgon/asus-expertbook-linux">GitHub →</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero" style="border-top: 0;">
+    <div class="wrap">
+      <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
+      <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
+      <p class="lede">
+        A versioned patcher of small, surgical userspace fixes for the 2026
+        ASUS ExpertBook Ultra (B9406CAA). Restores the haptic touchpad,
+        speakers, and Wi-Fi 7 stability — without downgrading hardware
+        capabilities or replacing kernel drivers.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#install">Install</a>
+        <a class="btn" href="https://github.com/burakgon/asus-expertbook-linux">GitHub repo →</a>
+      </div>
+      <div class="hero-meta">
+        <span>Linux 6.18+ / 7.x</span>
+        <span>Arch / CachyOS · Fedora · Ubuntu</span>
+        <span>MIT licensed</span>
+        <span>No kernel patches required</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="hardware">
+    <div class="wrap">
+      <h2>The hardware</h2>
+      <p class="sub">
+        The 2026 ExpertBook Ultra is a Panther Lake machine with three
+        Linux-side issues out of the box: a brand-new haptic touchpad
+        whose pressure axis confuses libinput, Cirrus speaker amplifiers
+        whose firmware isn't shipped for this exact subsystem ID, and a
+        Wi-Fi 7 BE211 driven by the new <code>iwlmld</code> driver.
+      </p>
+      <dl class="specs">
+        <dt>Model</dt>           <dd><span class="mono">ASUS ExpertBook Ultra B9406CAA</span></dd>
+        <dt>CPU</dt>             <dd>Intel Core Ultra X7 / X9 (Panther Lake)</dd>
+        <dt>Touchpad</dt>        <dd>PixArt I²C-HID haptic <span class="mono">093A:4F05</span> (ACPI <span class="mono">ASCP1D80</span>)</dd>
+        <dt>Audio</dt>           <dd>SOF + Cirrus <span class="mono">CS42L43</span> codec, 2× <span class="mono">CS35L56</span> speaker amps (subsystem <span class="mono">1043:15e4</span>)</dd>
+        <dt>Wi-Fi</dt>           <dd>Intel Wi-Fi 7 <span class="mono">BE211</span> (Panther Lake CNVi, <span class="mono">8086:e440</span>)</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="fixes">
+    <div class="wrap">
+      <h2>What gets fixed</h2>
+      <p class="sub">Three independent modules, each delivering a targeted patch. Mix and match.</p>
+
+      <div class="grid grid-3">
+        <article class="card">
+          <h3>touchpad-fix <span class="ver">v1.1.0</span></h3>
+          <p>
+            The kernel mis-reports the haptic pressure-axis range, so
+            libinput discards every touch as a "kernel bug: Touch jump."
+            Cursor never moves.
+          </p>
+          <p style="color: var(--fg)">
+            <span class="badge ok">udev hwdb</span>
+            <span class="badge ok">libinput quirk</span>
+          </p>
+          <ul>
+            <li>Clamps <code>ABS_MT_PRESSURE</code> to a sane range</li>
+            <li>Tells libinput to ignore pressure entirely (<code>AttrEventCode</code>)</li>
+            <li>Same pattern as the shipped Asus UX302LA quirk</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>audio-fix <span class="ver">v1.2.0</span></h3>
+          <p>
+            CS35L56 amps boot in <code>FIRMWARE_MISSING</code>; ALSA UCM
+            is missing the <code>cs42l43-spk+cs35l56</code> codec dir;
+            WirePlumber lands on an unrouted <code>stereo-fallback</code>
+            profile.
+          </p>
+          <p style="color: var(--fg)">
+            <span class="badge ok">CS35L56 firmware</span>
+            <span class="badge ok">UCM init.conf</span>
+            <span class="badge ok">WirePlumber rule</span>
+          </p>
+          <ul>
+            <li>Bin + wmfw for subsystem <code>1043:15e4</code></li>
+            <li>Patches chip ROM 3.4.4 → 3.13.4, calibration applies</li>
+            <li>Pins the card to Pro Audio so the Speaker sink is reachable</li>
+            <li>Hides Bluetooth/Deepbuffer noise; renames sinks/sources</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h3>wifi-fix <span class="ver">v1.1.0</span></h3>
+          <p>
+            "Missed beacons exceeds threshold" spam, occasional
+            <code>Microcode SW error</code> freezes, drops on 6 GHz /
+            320 MHz. Pure userspace tunables — no band downgrade,
+            Bluetooth coex stays on.
+          </p>
+          <p style="color: var(--fg)">
+            <span class="badge ok">modprobe.d</span>
+            <span class="badge ok">tmpfiles.d</span>
+            <span class="badge ok">NM dispatcher</span>
+          </p>
+          <ul>
+            <li><code>iwlmld.power_scheme=1</code> (active, no driver power-save)</li>
+            <li>Global PCIe ASPM = performance (CNVi has no per-device knobs)</li>
+            <li>Disables TSO/GSO/GRO on iwlwifi (offload bug workaround)</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Install</h2>
+      <p class="sub">
+        Three modules, one patcher. Idempotent install, tracked versions,
+        previewable diffs, clean uninstall.
+      </p>
+
+      <ol class="steps">
+        <li>
+          Clone the repo:
+          <pre><code>git clone https://github.com/burakgon/asus-expertbook-linux.git
+cd asus-expertbook-linux</code></pre>
+        </li>
+        <li>
+          Inspect what's available:
+          <pre><code>./patch.sh list</code></pre>
+        </li>
+        <li>
+          Install everything:
+          <pre><code>./patch.sh install-all
+sudo reboot</code></pre>
+        </li>
+        <li>
+          Or run the interactive menu (re-execs under sudo automatically):
+          <pre><code>./patch.sh</code></pre>
+        </li>
+      </ol>
+
+      <p style="margin-top: 28px">
+        After reboot, verify:
+      </p>
+      <pre><code>./patch.sh status</code></pre>
+    </div>
+  </section>
+
+  <section id="modules">
+    <div class="wrap">
+      <h2>Modules</h2>
+      <p class="sub">
+        Each module is a folder containing a <code>module.sh</code> manifest,
+        the payload files, and a README. The patcher discovers modules
+        automatically — drop a new folder in to add one.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>Module</th><th>Version</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/touchpad-fix">touchpad-fix</a></td>
+            <td><span class="mono">1.1.0</span></td>
+            <td>PixArt 093A:4F05 haptic touchpad — pressure quirk + libinput override</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/audio-fix">audio-fix</a></td>
+            <td><span class="mono">1.2.0</span></td>
+            <td>Cirrus CS35L56 firmware + UCM + WirePlumber Pro Audio profile</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/wifi-fix">wifi-fix</a></td>
+            <td><span class="mono">1.1.0</span></td>
+            <td>Intel Wi-Fi 7 BE211 — iwlmld power, ASPM, offload tweaks</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="patcher">
+    <div class="wrap">
+      <h2>The patcher</h2>
+      <p class="sub">
+        <code>patch.sh</code> is a small bash module manager.
+        Each module declares <code>MODULE_FILES</code>,
+        <code>MODULE_VERSION</code>, and optional pre/post hooks. The
+        patcher records the installed version under
+        <code>/var/lib/asus_expertboot_patcher</code> and flags updates
+        whenever the source <code>MODULE_VERSION</code> bumps.
+      </p>
+
+      <div class="grid grid-2">
+        <article class="card">
+          <h3>Commands</h3>
+          <pre style="margin-top: 6px"><code>./patch.sh                # interactive menu
+./patch.sh list           # discover + state
+./patch.sh status         # detailed
+./patch.sh diff           # source vs installed
+./patch.sh install &lt;mod&gt;  # idempotent (also "update")
+./patch.sh update-all     # only re-installs out-of-date modules
+./patch.sh uninstall &lt;mod&gt;</code></pre>
+        </article>
+        <article class="card">
+          <h3>State table</h3>
+          <table style="margin-top: 6px">
+            <thead><tr><th>Files</th><th>State file</th><th>Reported as</th></tr></thead>
+            <tbody>
+              <tr><td>none</td><td>—</td><td>not installed</td></tr>
+              <tr><td>all</td><td>—</td><td>untracked</td></tr>
+              <tr><td>all</td><td>matches</td><td>up to date</td></tr>
+              <tr><td>all</td><td>older</td><td>update available</td></tr>
+              <tr><td>some</td><td>any</td><td>partial</td></tr>
+            </tbody>
+          </table>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>FAQ</h2>
+
+      <details>
+        <summary>Why not just upstream the fixes?</summary>
+        <p>
+          They will be — these are workarounds for upstream gaps. The
+          touchpad needs a libinput quirk and a kernel HID parser fix.
+          The audio needs <code>cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.{wmfw,bin}</code>
+          shipped in <code>linux-firmware</code> and a real
+          <code>cs42l43-spk+cs35l56</code> codec dir in
+          <code>alsa-ucm-conf</code>. The Wi-Fi tweaks should become driver
+          defaults once the iwlmld stack matures. When all three land
+          upstream, this whole repo becomes deletable.
+        </p>
+      </details>
+
+      <details>
+        <summary>Does this break Bluetooth?</summary>
+        <p>
+          No. The Wi-Fi module deliberately leaves
+          <code>iwlwifi.bt_coex_active=Y</code> alone. BT audio, HID, and
+          file transfer keep working as usual.
+        </p>
+      </details>
+
+      <details>
+        <summary>Does this downgrade Wi-Fi 7 to Wi-Fi 6?</summary>
+        <p>
+          No. The card stays on Wi-Fi 7 / 6 GHz / 320 MHz wherever the AP
+          and signal allow it. The wifi-fix only disables the driver-side
+          power-save loop, the L1.x ASPM wake latency, and the buggy
+          TX-segmentation offload — none of which limits link speed.
+        </p>
+      </details>
+
+      <details>
+        <summary>What about the F1 mute LED?</summary>
+        <p>
+          Still stays in the EC firmware default. The UCM
+          <code>SetLED</code> hook only fires under a HiFi UCM profile,
+          and we route through Pro Audio because the HiFi profile for
+          <code>cs42l43-spk+cs35l56</code> doesn't exist upstream yet.
+          Cosmetic, doesn't affect actual audio.
+        </p>
+      </details>
+
+      <details>
+        <summary>Will this work on similar ASUS models?</summary>
+        <p>
+          The audio-fix's firmware files are matched on PCI subsystem
+          <code>1043:15e4</code> (this exact laptop). Sibling models
+          <code>104315d4</code> and <code>104315f4</code> would need
+          their own firmware bins — but the rest of the patcher
+          (touchpad and Wi-Fi) is largely transferable. PRs welcome.
+        </p>
+      </details>
+
+      <details>
+        <summary>Where does the CS35L56 firmware come from?</summary>
+        <p>
+          Both <code>.bin</code> files are upstream
+          <a href="https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/cirrus">linux-firmware</a>
+          (<code>cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code>).
+          The <code>.wmfw</code> is the generic
+          <code>cs35l56/CS35L56_Rev3.13.4.wmfw</code> renamed into the
+          per-OEM filename pattern the cs35l56 driver looks for. The
+          dmesg banner shows the firmware was built by Cirrus for ASUS
+          B9406CAA.
+        </p>
+      </details>
+
+      <details>
+        <summary>Add my model / adjacent fix?</summary>
+        <p>
+          Open an issue or a PR. The module format is intentionally
+          tiny — a folder with <code>module.sh</code>, the files, and
+          a README. Look at <code>touchpad-fix/module.sh</code> as the
+          smallest example.
+        </p>
+      </details>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-row">
+    <div>
+      <strong>asus-expertbook-linux</strong> · MIT licensed.
+      Firmware files redistributed from upstream
+      <a href="https://gitlab.com/kernel-firmware/linux-firmware">linux-firmware</a>
+      under their original terms.
+    </div>
+    <div>
+      <a href="https://github.com/burakgon/asus-expertbook-linux">GitHub</a> ·
+      <a href="https://github.com/burakgon/asus-expertbook-linux/issues">Issues</a> ·
+      <a href="https://github.com/burakgon/asus-expertbook-linux/blob/main/LICENSE">License</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

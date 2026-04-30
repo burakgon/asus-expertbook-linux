@@ -1,0 +1,19 @@
+Third-party files redistributed in this repository
+==================================================
+
+The following firmware files in audio-fix/ are redistributed verbatim from
+the upstream linux-firmware repository
+(https://gitlab.com/kernel-firmware/linux-firmware), under the Cirrus Logic
+redistribution terms documented in upstream linux-firmware's WHENCE / LICENCE
+files. They are NOT covered by this repository's MIT license.
+
+  audio-fix/cs35l56-b0-dsp1-misc-104315e4-l2u0.bin
+  audio-fix/cs35l56-b0-dsp1-misc-104315e4-l2u1.bin
+    Origin: cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin
+    upstream linux-firmware, main branch.
+
+  audio-fix/cs35l56-b0-dsp1-misc-104315e4-l2u0.wmfw
+  audio-fix/cs35l56-b0-dsp1-misc-104315e4-l2u1.wmfw
+    Origin: cirrus/cs35l56/CS35L56_Rev3.13.4.wmfw from upstream
+    linux-firmware, renamed into the per-OEM filename pattern the
+    cs35l56 driver looks for. Same file, two filenames.

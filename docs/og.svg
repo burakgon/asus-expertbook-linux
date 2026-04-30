@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0b0d10"/>
+      <stop offset="100%" stop-color="#11151a"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="78%" cy="14%" r="55%">
+      <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#7dd3fc" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="10%" cy="0%" r="55%">
+      <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#e8eef5"/>
+      <stop offset="100%" stop-color="#a3c8e0"/>
+    </linearGradient>
+    <linearGradient id="dot" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+
+  <!-- brand row -->
+  <g transform="translate(80, 90)">
+    <circle cx="14" cy="14" r="14" fill="url(#dot)"/>
+    <text x="42" y="22" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="26" fill="#e8eef5" font-weight="600" letter-spacing="-0.3">asus-expertbook-linux</text>
+  </g>
+
+  <!-- eyebrow -->
+  <g transform="translate(80, 170)">
+    <rect x="0" y="0" width="320" height="42" rx="999" fill="#11151a" stroke="#232a33"/>
+    <text x="22" y="28" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" letter-spacing="3" fill="#8a96a3" font-weight="500">2026 · PANTHER LAKE · B9406CAA</text>
+  </g>
+
+  <!-- title -->
+  <g transform="translate(80, 250)">
+    <text x="0" y="0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="74" font-weight="700" letter-spacing="-2" fill="url(#title)">
+      <tspan x="0" dy="0">ASUS ExpertBook Ultra</tspan>
+      <tspan x="0" dy="86">on Linux,</tspan>
+      <tspan x="0" dy="86" fill="#7dd3fc">without the broken bits.</tspan>
+    </text>
+  </g>
+
+  <!-- chips -->
+  <g transform="translate(80, 540)" font-family="ui-monospace, JetBrains Mono, SF Mono, monospace" font-size="18" fill="#8a96a3">
+    <g>
+      <rect x="0" y="0" width="160" height="38" rx="8" fill="#161b22" stroke="#2f3a47"/>
+      <text x="80" y="25" text-anchor="middle">touchpad-fix</text>
+    </g>
+    <g transform="translate(176, 0)">
+      <rect x="0" y="0" width="130" height="38" rx="8" fill="#161b22" stroke="#2f3a47"/>
+      <text x="65" y="25" text-anchor="middle">audio-fix</text>
+    </g>
+    <g transform="translate(322, 0)">
+      <rect x="0" y="0" width="120" height="38" rx="8" fill="#161b22" stroke="#2f3a47"/>
+      <text x="60" y="25" text-anchor="middle">wifi-fix</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+# ASUS ExpertBook Ultra (B9406CAA) PixArt I2C-HID haptic touchpad (093A:4F05)
+# The kernel HID descriptor parser appears to mis-report pressure axis range.
+# Rather than fight pressure thresholds, disable pressure axes entirely; the
+# touchpad reports BTN_TOUCH reliably so libinput uses that for touch state.
+# Pattern borrowed from the shipped Asus UX302LA quirk in
+# /usr/share/libinput/50-system-asus.quirks.
+[ASUS ExpertBook Ultra B9406 Touchpad]
+MatchUdevType=touchpad
+MatchBus=i2c
+MatchVendor=0x093A
+MatchProduct=0x4F05
+AttrEventCode=-ABS_MT_PRESSURE;-ABS_PRESSURE;

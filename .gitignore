@@ -1,0 +1,15 @@
+# tmp / OS
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# editor / IDE
+.vscode/
+.idea/
+
+# build artefacts (none expected, but safety)
+*.o
+*.so
+*.zst.tmp

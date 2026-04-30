@@ -1,0 +1,26 @@
+#!/bin/bash
+# NetworkManager dispatcher: disable TSO/GSO/GRO on iwlwifi interfaces
+# whenever they come up. The Intel iwlwifi/iwlmld TX-segmentation offload
+# path has long-standing bugs (kernel 6.16–7.x) that, under heavy traffic,
+# cause "missed beacons" / "Microcode SW error" / 10-second freezes on
+# Wi-Fi 7 cards (BE200, BE201, BE211).
+#
+# Disabling segmentation offload pushes that work onto the CPU. On modern
+# Core Ultra silicon the cost is negligible compared to the cost of
+# repeatedly tearing down a 320 MHz Wi-Fi 7 link.
+#
+# This script is a no-op for non-iwlwifi interfaces.
+
+iface="$1"
+event="$2"
+
+[ "$event" = "up" ] || exit 0
+[ -n "$iface" ] || exit 0
+
+driver=$(readlink "/sys/class/net/$iface/device/driver" 2>/dev/null)
+case "$driver" in
+  */iwlwifi) ;;
+  *) exit 0 ;;
+esac
+
+/usr/bin/ethtool -K "$iface" tso off gso off gro off >/dev/null 2>&1 || true
