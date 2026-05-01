@@ -269,7 +269,15 @@
   td.ok { color: var(--ok); }
 
   /* Before/after rows */
-  .ba-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch; margin: 12px 0; }
+  .ba-block { margin: 18px 0 22px; }
+  .ba-hw {
+    display: block; padding: 6px 14px; margin-bottom: 8px;
+    border-left: 3px solid var(--accent);
+    color: var(--fg);
+    font-size: 0.86rem;
+  }
+  .ba-hw .mono { color: var(--accent); }
+  .ba-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch; }
   .ba-cell {
     border-radius: 10px; padding: 14px 16px;
     border: 1px solid var(--border);
@@ -434,89 +442,107 @@ Result: install-all is appropriate for this hardware.</code></pre>
         recognised mechanism distros already use for other laptops.
       </p>
 
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — touchpad</strong>
-          Cursor doesn't move when you touch the pad. Kernel log spams<br>
-          <code>kernel bug: Touch jump detected and discarded.</code>
-        </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>touchpad-fix</code></strong>
-          Light touch responds normally. <code>libinput quirks list /dev/input/event9</code>
-          confirms the pressure-axis quirk is loaded.
-        </div>
-      </div>
-
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — speakers</strong>
-          Completely silent. dmesg: <code>cs35l56: FIRMWARE_MISSING</code>,
-          <code>Calibration disabled</code>. F1 mute LED stuck on.
-        </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>audio-fix</code></strong>
-          Speakers play, volume control works. dmesg:
-          <code>Calibration applied</code>, <code>Tuning PID: 0x23134</code>.
+      <div class="ba-block">
+        <div class="ba-hw"><strong>PixArt I²C-HID</strong> haptic touchpad <span class="mono">093A:4F05</span> (ACPI <span class="mono">ASCP1D80</span>)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — touchpad</strong>
+            Cursor doesn't move when you touch the pad. Kernel log spams<br>
+            <code>kernel bug: Touch jump detected and discarded.</code>
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>touchpad-fix</code></strong>
+            Light touch responds normally. <code>libinput quirks list /dev/input/event9</code>
+            confirms the pressure-axis quirk is loaded.
+          </div>
         </div>
       </div>
 
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — Wi-Fi</strong>
-          BE211 link unstable. Kernel log spams <code>missed beacons exceeds threshold</code>.
-          Heavy traffic triggers <code>Microcode SW error</code> 10s freezes.
-        </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>wifi-fix</code></strong>
-          Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam.
-          No freezes under load.
-        </div>
-      </div>
-
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — internal panel</strong>
-          eDP-1 goes black mid-session.
-          <code>kwin_wayland: Pageflip timed out!</code>
-          Only a reboot recovers.
-        </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>display-fix</code></strong>
-          Internal panel stable indefinitely. PSR / Panel Replay disabled
-          cleanly at boot via kernel cmdline.
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Cirrus CS42L43</strong> codec + 2× <strong>CS35L56</strong> speaker amps (PCI subsystem <span class="mono">1043:15e4</span>)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — speakers</strong>
+            Completely silent. dmesg: <code>cs35l56: FIRMWARE_MISSING</code>,
+            <code>Calibration disabled</code>. F1 mute LED stuck on.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>audio-fix</code></strong>
+            Speakers play, volume control works. dmesg:
+            <code>Calibration applied</code>, <code>Tuning PID: 0x23134</code>.
+          </div>
         </div>
       </div>
 
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — idle power</strong>
-          ~4–5 W idle. Fans audible. P-cores never deep-sleep.
-        </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>intel-perf-fix</code></strong>
-          ~2–2.5 W idle. All idle work parks on a single LP-E core.
-          P-cores reach <code>C10</code>.
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Intel Wi-Fi 7 BE211</strong> Panther Lake CNVi (<span class="mono">8086:e440</span>)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — Wi-Fi</strong>
+            BE211 link unstable. Kernel log spams <code>missed beacons exceeds threshold</code>.
+            Heavy traffic triggers <code>Microcode SW error</code> 10s freezes.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>wifi-fix</code></strong>
+            Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam.
+            No freezes under load.
+          </div>
         </div>
       </div>
 
-      <div class="ba-row">
-        <div class="ba-cell ba-bad">
-          <strong>Before — AI camera effects</strong>
-          No Linux equivalent of Windows Studio Effects.
-          NPU sits idle, no virtual cam, no background blur / smart framing /
-          voice focus shipped out of the box.
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Samsung Display Corp</strong> eDP panel + Intel <strong><code>xe</code></strong> driver (Xe3 Panther Lake iGPU)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — internal panel</strong>
+            eDP-1 goes black mid-session.
+            <code>kwin_wayland: Pageflip timed out!</code>
+            Only a reboot recovers.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>display-fix</code></strong>
+            Internal panel stable indefinitely. PSR / Panel Replay disabled
+            cleanly at boot via kernel cmdline.
+          </div>
         </div>
-        <div class="ba-arrow">→</div>
-        <div class="ba-cell ba-good">
-          <strong>After — <code>webcam-ai-fix</code></strong>
-          OBS pipeline + <code>obs-backgroundremoval</code> plugin + virtual
-          cam (<code>/dev/video10</code> "AI Camera"). NPU acceleration when
-          OpenVINO is added.
+      </div>
+
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Intel Core Ultra X7 / X9</strong> Panther Lake hybrid (P + E + LP-E cores)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — idle power</strong>
+            ~4–5 W idle. Fans audible. P-cores never deep-sleep.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>intel-perf-fix</code></strong>
+            ~2–2.5 W idle. All idle work parks on a single LP-E core.
+            P-cores reach <code>C10</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Intel Panther Lake NPU</strong> (<span class="mono">8086:b03e</span>) + USB UVC webcam</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — AI camera effects</strong>
+            No Linux equivalent of Windows Studio Effects.
+            NPU sits idle, no virtual cam, no background blur / smart framing /
+            voice focus shipped out of the box.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>webcam-ai-fix</code></strong>
+            OBS pipeline + <code>obs-backgroundremoval</code> plugin + virtual
+            cam (<code>/dev/video10</code> "AI Camera"). NPU acceleration when
+            OpenVINO is added.
+          </div>
         </div>
       </div>
     </div>

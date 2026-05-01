@@ -46,14 +46,14 @@ parts of `intel-perf-fix` are Arch-specific.
 
 ## What this actually fixes — before / after
 
-| Symptom out of the box | After installing | Module |
-|---|---|---|
-| **Touchpad doesn't move the cursor.** Kernel log spams `kernel bug: Touch jump detected and discarded.` libinput rejects every event. | Cursor responds to light touches like any normal laptop. Zero "Touch jump" lines. | [`touchpad-fix`](touchpad-fix/) |
-| **Speakers are completely silent.** dmesg: `cs35l56: FIRMWARE_MISSING`, `Calibration disabled`. F1 mute LED stuck on. | Speakers play at any volume. dmesg: `Calibration applied`, `Tuning PID: 0x23134`. | [`audio-fix`](audio-fix/) |
-| **Wi-Fi 7 BE211 link unstable.** Kernel log spams `missed beacons exceeds threshold, but receiving data`. Throughput drops, occasional `Microcode SW error` 10 second freezes. | Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam. No freezes under heavy load. | [`wifi-fix`](wifi-fix/) |
-| **Internal panel goes black.** `kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver`. eDP-1 wedges, only reboot recovers. | Internal display stable indefinitely. PSR / Panel Replay disabled cleanly at boot. | [`display-fix`](display-fix/) |
-| **Idle power 4–5 W**, fans audible at idle, P-cores never deep-sleep. | Idle ≈ 2–2.5 W. Workload parks on a single LP-E core. P-cores reach `C10`. | [`intel-perf-fix`](intel-perf-fix/) |
-| **No AI camera effects.** Windows Studio Effects (background blur, smart framing, voice focus) doesn't exist on Linux out of the box. | Same effects via OBS + `obs-backgroundremoval` plugin, exposed as a virtual camera ("AI Camera") that any chat app can use. NPU-acceleration available with `paru -S openvino`. | [`webcam-ai-fix`](webcam-ai-fix/) |
+| Hardware | Symptom out of the box | After installing | Module |
+|---|---|---|---|
+| **PixArt I²C-HID** haptic touchpad `093A:4F05` (ACPI `ASCP1D80`) | **Touchpad doesn't move the cursor.** Kernel log spams `kernel bug: Touch jump detected and discarded.` libinput rejects every event. | Cursor responds to light touches like any normal laptop. Zero "Touch jump" lines. | [`touchpad-fix`](touchpad-fix/) |
+| **Cirrus CS42L43** codec + 2× **CS35L56** speaker amps (PCI subsystem `1043:15e4`) | **Speakers are completely silent.** dmesg: `cs35l56: FIRMWARE_MISSING`, `Calibration disabled`. F1 mute LED stuck on. | Speakers play at any volume. dmesg: `Calibration applied`, `Tuning PID: 0x23134`. | [`audio-fix`](audio-fix/) |
+| **Intel Wi-Fi 7 BE211** Panther Lake CNVi (`8086:e440`) | **Wi-Fi 7 link unstable.** Kernel log spams `missed beacons exceeds threshold, but receiving data`. Throughput drops, occasional `Microcode SW error` 10 second freezes. | Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam. No freezes under heavy load. | [`wifi-fix`](wifi-fix/) |
+| **Samsung Display Corp** eDP panel + Intel **`xe`** driver (Xe3 Panther Lake iGPU) | **Internal panel goes black.** `kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver`. eDP-1 wedges, only reboot recovers. | Internal display stable indefinitely. PSR / Panel Replay disabled cleanly at boot. | [`display-fix`](display-fix/) |
+| **Intel Core Ultra X7/X9** Panther Lake hybrid (P + E + LP-E cores) | **Idle power 4–5 W**, fans audible at idle, P-cores never deep-sleep. | Idle ≈ 2–2.5 W. Workload parks on a single LP-E core. P-cores reach `C10`. | [`intel-perf-fix`](intel-perf-fix/) |
+| **Intel Panther Lake NPU** (`8086:b03e`) + USB UVC webcam | **No AI camera effects.** Windows Studio Effects (background blur, smart framing, voice focus) doesn't exist on Linux out of the box. | Same effects via OBS + `obs-backgroundremoval` plugin, exposed as a virtual camera ("AI Camera") that any chat app can use. NPU-acceleration available with `paru -S openvino`. | [`webcam-ai-fix`](webcam-ai-fix/) |
 
 > **Nothing this repo installs is a band-aid in the bad sense.** Every module
 > uses the exact same upstream-recognised mechanism (udev hwdb, libinput
