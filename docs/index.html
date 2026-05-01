@@ -5,24 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
 
-<title>ASUS ExpertBook Ultra (B9406CAA) on Linux — Touchpad, Wi-Fi 7 BE211, Cirrus CS35L56 fixes</title>
-<meta name="description" content="Working Linux compatibility fixes for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake). Patches for the PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, ALSA UCM, and Intel Wi-Fi 7 BE211 stability — packaged as a tracked, versioned patcher.">
-<meta name="keywords" content="ASUS ExpertBook Ultra, B9406CAA, Linux, Wi-Fi 7 BE211, Cirrus CS35L56, PixArt 4F05, ASCP1D80, Panther Lake, iwlmld, sof-soundwire, cs42l43, ALSA UCM, libinput quirk, haptic touchpad, kernel firmware">
+<title>ASUS ExpertBook Ultra B9406CAA on Linux — Touchpad, Wi-Fi 7 BE211, Cirrus CS35L56 fixes</title>
+<meta name="description" content="Complete Linux compatibility patches for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake): PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, Intel Wi-Fi 7 BE211 stability, xe driver display lockup, and Intel power tuning. Tracked, versioned, reversible patcher.">
+<meta name="keywords" content="ASUS ExpertBook Ultra, B9406CAA, Linux, Wi-Fi 7 BE211, Cirrus CS35L56, PixArt 4F05, ASCP1D80, Panther Lake, iwlmld, sof-soundwire, cs42l43, ALSA UCM, libinput quirk, haptic touchpad, kernel firmware, xe driver, Panel Replay, intel-lpmd, thermald">
 <link rel="canonical" href="https://burakgon.github.io/asus-expertbook-linux/">
 
 <meta property="og:type" content="website">
-<meta property="og:title" content="ASUS ExpertBook Ultra (B9406CAA) on Linux">
-<meta property="og:description" content="Touchpad, Wi-Fi 7 BE211, and Cirrus CS35L56 speaker fixes for the 2026 ASUS ExpertBook Ultra — packaged as a tracked, versioned patcher.">
+<meta property="og:title" content="ASUS ExpertBook Ultra (B9406CAA) on Linux — every fix in one repo">
+<meta property="og:description" content="Touchpad, audio, Wi-Fi 7, display, and power-tuning fixes for the 2026 ASUS ExpertBook Ultra. Versioned patcher, no kernel rebuild required.">
 <meta property="og:url" content="https://burakgon.github.io/asus-expertbook-linux/">
 <meta property="og:site_name" content="asus-expertbook-linux">
 <meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — patcher with three modules: touchpad-fix, audio-fix, wifi-fix">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — five modules: touchpad, audio, wifi, display, perf">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="ASUS ExpertBook Ultra (B9406CAA) on Linux">
-<meta name="twitter:description" content="Touchpad, Wi-Fi 7 BE211, and Cirrus CS35L56 speaker fixes — versioned patcher.">
+<meta name="twitter:title" content="ASUS ExpertBook Ultra B9406CAA on Linux">
+<meta name="twitter:description" content="Touchpad + audio + Wi-Fi 7 + display + Panther Lake power tuning. Versioned, reversible patcher.">
 <meta name="twitter:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
@@ -36,8 +36,8 @@
   "name": "asus-expertbook-linux",
   "alternateName": "ASUS ExpertBook Ultra B9406CAA Linux fixes",
   "applicationCategory": "Driver",
-  "operatingSystem": "Linux",
-  "description": "Linux compatibility patches for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake): PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, ALSA UCM, and Intel Wi-Fi 7 BE211 stability tweaks. Packaged as a tracked, versioned patcher.",
+  "operatingSystem": "Linux 6.18+",
+  "description": "Linux compatibility patches for the 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake): PixArt 093A:4F05 haptic touchpad, Cirrus CS35L56 speaker firmware, Intel Wi-Fi 7 BE211 stability, xe driver display lockup workaround, and Panther Lake idle/thermal tuning. Packaged as a tracked, versioned, reversible patcher.",
   "softwareVersion": "1.x",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "url": "https://burakgon.github.io/asus-expertbook-linux/",
@@ -61,6 +61,7 @@
     --accent-2: #c4b5fd;
     --warn: #fbbf24;
     --ok: #86efac;
+    --bad: #fca5a5;
     --code-bg: #0a0d11;
     --hero-grad: radial-gradient(1200px 600px at 70% -10%, rgba(125,211,252,0.10), transparent 60%),
                  radial-gradient(900px 500px at 10% 0%, rgba(196,181,253,0.07), transparent 60%);
@@ -68,18 +69,11 @@
   }
   @media (prefers-color-scheme: light) {
     :root {
-      --bg: #ffffff;
-      --bg-elev: #f7f9fc;
-      --bg-elev-2: #ffffff;
-      --border: #e2e8f0;
-      --border-strong: #cbd5e1;
-      --fg: #0f172a;
-      --fg-muted: #475569;
-      --fg-dim: #94a3b8;
-      --accent: #0369a1;
-      --accent-2: #6d28d9;
-      --warn: #b45309;
-      --ok: #15803d;
+      --bg: #ffffff; --bg-elev: #f7f9fc; --bg-elev-2: #ffffff;
+      --border: #e2e8f0; --border-strong: #cbd5e1;
+      --fg: #0f172a; --fg-muted: #475569; --fg-dim: #94a3b8;
+      --accent: #0369a1; --accent-2: #6d28d9;
+      --warn: #b45309; --ok: #15803d; --bad: #b91c1c;
       --code-bg: #f1f5f9;
       --hero-grad: radial-gradient(1200px 600px at 70% -10%, rgba(3,105,161,0.10), transparent 60%),
                    radial-gradient(900px 500px at 10% 0%, rgba(109,40,217,0.07), transparent 60%);
@@ -112,8 +106,14 @@
     overflow-x: auto;
     margin: 12px 0;
     box-shadow: var(--shadow);
+    position: relative;
   }
   pre code { background: none; border: none; padding: 0; }
+  pre.term::before {
+    content: "● ● ●"; position: absolute; top: 6px; left: 12px;
+    color: var(--fg-dim); font-size: 0.7rem; letter-spacing: 4px;
+  }
+  pre.term { padding-top: 30px; }
 
   /* Layout */
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
@@ -124,17 +124,14 @@
     background: color-mix(in oklab, var(--bg) 75%, transparent);
     border-bottom: 1px solid var(--border);
   }
-  .nav-row {
-    display: flex; align-items: center; gap: 24px;
-    padding: 14px 0;
-  }
+  .nav-row { display: flex; align-items: center; gap: 24px; padding: 14px 0; }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
   .brand .dot {
     width: 10px; height: 10px; border-radius: 999px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent);
   }
-  nav.links { margin-left: auto; display: flex; gap: 18px; font-size: 0.94rem; }
+  nav.links { margin-left: auto; display: flex; gap: 18px; font-size: 0.94rem; flex-wrap: wrap; }
   nav.links a { color: var(--fg-muted); }
   nav.links a:hover { color: var(--fg); text-decoration: none; }
   .gh-cta {
@@ -167,8 +164,7 @@
   .lede {
     font-size: clamp(1.05rem, 1.5vw, 1.2rem);
     color: var(--fg-muted);
-    max-width: 60ch;
-    margin: 0 0 28px;
+    max-width: 60ch; margin: 0 0 28px;
   }
   .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
   .btn {
@@ -187,21 +183,36 @@
   }
   .btn-primary:hover { color: #0b0d10; border-color: transparent; }
 
-  .hero-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; color: var(--fg-dim); font-size: 0.88rem; }
-  .hero-meta span::before { content: "·"; margin-right: 16px; color: var(--fg-dim); }
-  .hero-meta span:first-child::before { content: ""; margin: 0; }
+  .badges {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px;
+  }
+  .badges img { vertical-align: middle; height: 22px; }
 
   /* Sections */
-  section { padding: 60px 0; border-top: 1px solid var(--border); }
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
   section h2 {
     font-size: clamp(1.6rem, 3vw, 2rem); letter-spacing: -0.02em;
     margin: 0 0 12px;
   }
+  section h3 { font-size: 1.15rem; letter-spacing: -0.01em; margin: 24px 0 10px; }
   section .sub { color: var(--fg-muted); margin: 0 0 32px; max-width: 70ch; }
+
+  /* Highlight box (for the curl command) */
+  .highlight {
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--accent) 6%, var(--bg-elev)),
+      var(--bg-elev));
+    border: 1px solid color-mix(in oklab, var(--accent) 25%, var(--border));
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+  }
+  .highlight pre { margin: 4px 0 0; }
 
   /* Card grid */
   .grid { display: grid; gap: 16px; }
-  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
   .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
   .card {
     background: var(--bg-elev);
@@ -232,6 +243,7 @@
   }
   .badge.ok { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 30%, var(--border)); }
   .badge.warn { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 30%, var(--border)); }
+  .badge.bad { color: var(--bad); border-color: color-mix(in oklab, var(--bad) 30%, var(--border)); }
 
   /* Hardware specs */
   dl.specs {
@@ -249,9 +261,32 @@
 
   /* Tables */
   table { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--fg-muted); font-weight: 600; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.06em; }
   td .mono { color: var(--accent); }
+  td .symbol { font-weight: 700; font-size: 1.05em; margin-right: 6px; }
+  td.bad { color: var(--bad); }
+  td.ok { color: var(--ok); }
+
+  /* Before/after rows */
+  .ba-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch; margin: 12px 0; }
+  .ba-cell {
+    border-radius: 10px; padding: 14px 16px;
+    border: 1px solid var(--border);
+    font-size: 0.93rem;
+  }
+  .ba-bad {
+    background: color-mix(in oklab, var(--bad) 6%, var(--bg-elev));
+    border-color: color-mix(in oklab, var(--bad) 25%, var(--border));
+  }
+  .ba-good {
+    background: color-mix(in oklab, var(--ok) 6%, var(--bg-elev));
+    border-color: color-mix(in oklab, var(--ok) 25%, var(--border));
+  }
+  .ba-arrow { display: flex; align-items: center; color: var(--fg-dim); font-size: 1.2em; }
+  .ba-cell strong { display: block; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .ba-bad strong { color: var(--bad); }
+  .ba-good strong { color: var(--ok); }
 
   /* Details / FAQ */
   details {
@@ -274,7 +309,7 @@
     display: inline-block; width: 14px;
   }
   details[open] summary::before { content: "−"; }
-  details p, details pre { color: var(--fg-muted); margin: 12px 0 4px; }
+  details > p, details > pre, details > ul, details > table { color: var(--fg-muted); margin: 12px 0 4px; }
   details pre { color: var(--fg); }
 
   /* Footer */
@@ -287,7 +322,11 @@
   footer a { color: var(--fg-muted); }
   .foot-row { display: flex; flex-wrap: wrap; gap: 24px; align-items: baseline; justify-content: space-between; }
 
-  /* Subtle animations */
+  /* Module section */
+  .mod-section h3 { display: flex; align-items: baseline; gap: 12px; }
+  .mod-section h3 .ver { font-size: 0.85rem; color: var(--fg-dim); font-weight: 500; }
+
+  /* Animations */
   @media (prefers-reduced-motion: no-preference) {
     .card, .btn { will-change: transform; }
     .hero h1 { animation: rise .6s ease-out both; }
@@ -296,8 +335,9 @@
     @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   }
 
-  /* Tiny screens */
-  @media (max-width: 540px) {
+  @media (max-width: 720px) {
+    .ba-row { grid-template-columns: 1fr; }
+    .ba-arrow { transform: rotate(90deg); justify-content: center; }
     nav.links a:not(.gh-cta) { display: none; }
     .hero { padding-top: 56px; }
   }
@@ -309,7 +349,8 @@
   <div class="wrap nav-row">
     <a href="#top" class="brand"><span class="dot"></span> asus-expertbook-linux</a>
     <nav class="links">
-      <a href="#fixes">Fixes</a>
+      <a href="#is-this-for-me">Is this for me?</a>
+      <a href="#before-after">Before / after</a>
       <a href="#install">Install</a>
       <a href="#modules">Modules</a>
       <a href="#faq">FAQ</a>
@@ -325,108 +366,142 @@
       <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
       <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
       <p class="lede">
-        A versioned patcher of small, surgical userspace fixes for the 2026
-        ASUS ExpertBook Ultra (B9406CAA). Restores the haptic touchpad,
-        speakers, and Wi-Fi 7 stability — without downgrading hardware
-        capabilities or replacing kernel drivers.
+        Five surgical, versioned, fully-reversible userspace patches that turn
+        the 2026 ASUS ExpertBook Ultra (B9406CAA) into a working Linux laptop —
+        without rebuilding the kernel, without downgrading hardware features,
+        and without breaking any of the things that already work.
       </p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="#install">Install</a>
+        <a class="btn btn-primary" href="#install">Install in 30 seconds</a>
         <a class="btn" href="https://github.com/burakgon/asus-expertbook-linux">GitHub repo →</a>
       </div>
-      <div class="hero-meta">
-        <span>Linux 6.18+ / 7.x</span>
-        <span>Arch / CachyOS · Fedora · Ubuntu</span>
-        <span>MIT licensed</span>
-        <span>No kernel patches required</span>
+      <div class="badges">
+        <img src="https://img.shields.io/badge/site-burakgon.github.io-7dd3fc?style=flat-square" alt="site">
+        <img src="https://img.shields.io/badge/license-MIT-c4b5fd?style=flat-square" alt="MIT">
+        <img src="https://img.shields.io/badge/linux-6.18%2B-86efac?style=flat-square" alt="Linux 6.18+">
+        <img src="https://img.shields.io/badge/hardware-B9406CAA-fbbf24?style=flat-square" alt="B9406CAA">
+        <img src="https://img.shields.io/badge/kernel%20patches-not%20required-86efac?style=flat-square" alt="No kernel patches">
       </div>
     </div>
   </section>
 
-  <section id="hardware">
+  <section id="is-this-for-me">
     <div class="wrap">
-      <h2>The hardware</h2>
+      <h2>Is this repo for me?</h2>
       <p class="sub">
-        The 2026 ExpertBook Ultra is a Panther Lake machine with three
-        Linux-side issues out of the box: a brand-new haptic touchpad
-        whose pressure axis confuses libinput, Cirrus speaker amplifiers
-        whose firmware isn't shipped for this exact subsystem ID, and a
-        Wi-Fi 7 BE211 driven by the new <code>iwlmld</code> driver.
+        Run this one-liner. It's read-only, no <code>sudo</code>, no system
+        changes — just probes the hardware and tells you which modules apply.
       </p>
-      <dl class="specs">
-        <dt>Model</dt>           <dd><span class="mono">ASUS ExpertBook Ultra B9406CAA</span></dd>
-        <dt>CPU</dt>             <dd>Intel Core Ultra X7 / X9 (Panther Lake)</dd>
-        <dt>Touchpad</dt>        <dd>PixArt I²C-HID haptic <span class="mono">093A:4F05</span> (ACPI <span class="mono">ASCP1D80</span>)</dd>
-        <dt>Audio</dt>           <dd>SOF + Cirrus <span class="mono">CS42L43</span> codec, 2× <span class="mono">CS35L56</span> speaker amps (subsystem <span class="mono">1043:15e4</span>)</dd>
-        <dt>Wi-Fi</dt>           <dd>Intel Wi-Fi 7 <span class="mono">BE211</span> (Panther Lake CNVi, <span class="mono">8086:e440</span>)</dd>
-      </dl>
+
+      <div class="highlight">
+        <pre class="term"><code>curl -fsSL https://raw.githubusercontent.com/burakgon/asus-expertbook-linux/main/scripts/check-hardware.sh | bash</code></pre>
+      </div>
+
+      <p style="margin-top: 28px">Expected output on this exact laptop:</p>
+      <pre class="term"><code>asus-expertbook-linux — hardware compatibility probe
+
+Laptop model
+  OK   ASUS EXPERTBOOK B9406CAA (full match — every module fits)
+
+CPU
+  OK   Intel(R) Core(TM) Ultra X7 358H (Panther Lake / Core Ultra Series 3)
+
+Touchpad
+  OK   PixArt 093A:4F05 (ACPI ASCP1D80) — touchpad-fix applies directly
+
+Audio (Cirrus CS42L43 + 2× CS35L56)
+  OK   subsystem 1043:15e4 — audio-fix firmware blobs apply directly
+  OK   cs35l56 / cs42l43 driver loaded
+
+Wi-Fi
+  OK   Intel Wi-Fi 7 BE211 (8086:e440) — wifi-fix applies directly
+  OK   iwlmld op_mode loaded (Wi-Fi 7 driver)
+
+Distro
+  OK   Arch (or derivative) — patcher's pacman + paths assumed correct
+
+Result: install-all is appropriate for this hardware.</code></pre>
     </div>
   </section>
 
-  <section id="fixes">
+  <section id="before-after">
     <div class="wrap">
-      <h2>What gets fixed</h2>
-      <p class="sub">Three independent modules, each delivering a targeted patch. Mix and match.</p>
+      <h2>Before / after</h2>
+      <p class="sub">
+        Each row is one symptom you'll hit on a fresh Linux install of this
+        laptop, and what changes after the corresponding module is installed.
+        No band-aids in the bad sense — every fix uses the same upstream-
+        recognised mechanism distros already use for other laptops.
+      </p>
 
-      <div class="grid grid-3">
-        <article class="card">
-          <h3>touchpad-fix <span class="ver">v1.1.0</span></h3>
-          <p>
-            The kernel mis-reports the haptic pressure-axis range, so
-            libinput discards every touch as a "kernel bug: Touch jump."
-            Cursor never moves.
-          </p>
-          <p style="color: var(--fg)">
-            <span class="badge ok">udev hwdb</span>
-            <span class="badge ok">libinput quirk</span>
-          </p>
-          <ul>
-            <li>Clamps <code>ABS_MT_PRESSURE</code> to a sane range</li>
-            <li>Tells libinput to ignore pressure entirely (<code>AttrEventCode</code>)</li>
-            <li>Same pattern as the shipped Asus UX302LA quirk</li>
-          </ul>
-        </article>
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — touchpad</strong>
+          Cursor doesn't move when you touch the pad. Kernel log spams<br>
+          <code>kernel bug: Touch jump detected and discarded.</code>
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>touchpad-fix</code></strong>
+          Light touch responds normally. <code>libinput quirks list /dev/input/event9</code>
+          confirms the pressure-axis quirk is loaded.
+        </div>
+      </div>
 
-        <article class="card">
-          <h3>audio-fix <span class="ver">v1.2.0</span></h3>
-          <p>
-            CS35L56 amps boot in <code>FIRMWARE_MISSING</code>; ALSA UCM
-            is missing the <code>cs42l43-spk+cs35l56</code> codec dir;
-            WirePlumber lands on an unrouted <code>stereo-fallback</code>
-            profile.
-          </p>
-          <p style="color: var(--fg)">
-            <span class="badge ok">CS35L56 firmware</span>
-            <span class="badge ok">UCM init.conf</span>
-            <span class="badge ok">WirePlumber rule</span>
-          </p>
-          <ul>
-            <li>Bin + wmfw for subsystem <code>1043:15e4</code></li>
-            <li>Patches chip ROM 3.4.4 → 3.13.4, calibration applies</li>
-            <li>Pins the card to Pro Audio so the Speaker sink is reachable</li>
-            <li>Hides Bluetooth/Deepbuffer noise; renames sinks/sources</li>
-          </ul>
-        </article>
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — speakers</strong>
+          Completely silent. dmesg: <code>cs35l56: FIRMWARE_MISSING</code>,
+          <code>Calibration disabled</code>. F1 mute LED stuck on.
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>audio-fix</code></strong>
+          Speakers play, volume control works. dmesg:
+          <code>Calibration applied</code>, <code>Tuning PID: 0x23134</code>.
+        </div>
+      </div>
 
-        <article class="card">
-          <h3>wifi-fix <span class="ver">v1.1.0</span></h3>
-          <p>
-            "Missed beacons exceeds threshold" spam, occasional
-            <code>Microcode SW error</code> freezes, drops on 6 GHz /
-            320 MHz. Pure userspace tunables — no band downgrade,
-            Bluetooth coex stays on.
-          </p>
-          <p style="color: var(--fg)">
-            <span class="badge ok">modprobe.d</span>
-            <span class="badge ok">tmpfiles.d</span>
-            <span class="badge ok">NM dispatcher</span>
-          </p>
-          <ul>
-            <li><code>iwlmld.power_scheme=1</code> (active, no driver power-save)</li>
-            <li>Global PCIe ASPM = performance (CNVi has no per-device knobs)</li>
-            <li>Disables TSO/GSO/GRO on iwlwifi (offload bug workaround)</li>
-          </ul>
-        </article>
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — Wi-Fi</strong>
+          BE211 link unstable. Kernel log spams <code>missed beacons exceeds threshold</code>.
+          Heavy traffic triggers <code>Microcode SW error</code> 10s freezes.
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>wifi-fix</code></strong>
+          Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam.
+          No freezes under load.
+        </div>
+      </div>
+
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — internal panel</strong>
+          eDP-1 goes black mid-session.
+          <code>kwin_wayland: Pageflip timed out!</code>
+          Only a reboot recovers.
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>display-fix</code></strong>
+          Internal panel stable indefinitely. PSR / Panel Replay disabled
+          cleanly at boot via kernel cmdline.
+        </div>
+      </div>
+
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — idle power</strong>
+          ~4–5 W idle. Fans audible. P-cores never deep-sleep.
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>intel-perf-fix</code></strong>
+          ~2–2.5 W idle. All idle work parks on a single LP-E core.
+          P-cores reach <code>C10</code>.
+        </div>
       </div>
     </div>
   </section>
@@ -435,69 +510,211 @@
     <div class="wrap">
       <h2>Install</h2>
       <p class="sub">
-        Three modules, one patcher. Idempotent install, tracked versions,
-        previewable diffs, clean uninstall.
+        Three idiomatic ways to use the patcher. All are idempotent and
+        reversible.
       </p>
 
-      <ol class="steps">
-        <li>
-          Clone the repo:
-          <pre><code>git clone https://github.com/burakgon/asus-expertbook-linux.git
-cd asus-expertbook-linux</code></pre>
-        </li>
-        <li>
-          Inspect what's available:
-          <pre><code>./patch.sh list</code></pre>
-        </li>
-        <li>
-          Install everything:
-          <pre><code>./patch.sh install-all
+      <h3>Option 1 — install everything</h3>
+      <pre class="term"><code>git clone https://github.com/burakgon/asus-expertbook-linux.git
+cd asus-expertbook-linux
+./patch.sh install-all
 sudo reboot</code></pre>
-        </li>
-        <li>
-          Or run the interactive menu (re-execs under sudo automatically):
-          <pre><code>./patch.sh</code></pre>
-        </li>
-      </ol>
 
-      <p style="margin-top: 28px">
-        After reboot, verify:
-      </p>
-      <pre><code>./patch.sh status</code></pre>
+      <h3>Option 2 — pick à la carte</h3>
+      <pre class="term"><code>./patch.sh list                       # see what's available + state
+./patch.sh install touchpad-fix audio-fix
+./patch.sh diff display-fix           # preview changes before applying
+./patch.sh uninstall wifi-fix         # back out anytime</code></pre>
+
+      <h3>Option 3 — interactive menu</h3>
+      <pre class="term"><code>./patch.sh    # auto-elevates with sudo
+
+=== asus_expertboot_linux patcher ===
+
+  #   Module             Version  Installed State          Description
+  -----------------------------------------------------------------------------
+  1   audio-fix          1.3.0    1.3.0     up to date     Speakers + mics + clean panel
+  2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
+  3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
+  4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
+  5   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
+
+Actions
+  i &lt;num&gt;    install / update module
+  u &lt;num&gt;    uninstall module
+  d &lt;num&gt;    diff source vs installed
+  s &lt;num&gt;    detailed status
+  I          install all modules
+  up         update all currently-installed
+  U          uninstall all modules
+  r          refresh
+  q          quit
+
+&gt;</code></pre>
+
+      <p style="margin-top: 28px">After install, verify any time with:</p>
+      <pre class="term"><code>./patch.sh status</code></pre>
     </div>
   </section>
 
   <section id="modules">
     <div class="wrap">
-      <h2>Modules</h2>
+      <h2>The five modules</h2>
       <p class="sub">
-        Each module is a folder containing a <code>module.sh</code> manifest,
-        the payload files, and a README. The patcher discovers modules
-        automatically — drop a new folder in to add one.
+        Each is a self-contained folder with a manifest, a payload, and a
+        README. Click any module to open the bug story and the file-level
+        details.
       </p>
 
       <table>
         <thead>
-          <tr><th>Module</th><th>Version</th><th>Description</th></tr>
+          <tr><th>Module</th><th>Version</th><th>Fixes</th></tr>
         </thead>
         <tbody>
           <tr>
-            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/touchpad-fix">touchpad-fix</a></td>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/touchpad-fix"><code>touchpad-fix</code></a></td>
             <td><span class="mono">1.1.0</span></td>
-            <td>PixArt 093A:4F05 haptic touchpad — pressure quirk + libinput override</td>
+            <td>PixArt 093A:4F05 haptic pad — pressure-axis quirk + libinput override</td>
           </tr>
           <tr>
-            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/audio-fix">audio-fix</a></td>
-            <td><span class="mono">1.2.0</span></td>
-            <td>Cirrus CS35L56 firmware + UCM + WirePlumber Pro Audio profile</td>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/audio-fix"><code>audio-fix</code></a></td>
+            <td><span class="mono">1.3.0</span></td>
+            <td>Cirrus CS35L56 firmware + UCM init + WirePlumber Pro Audio profile</td>
           </tr>
           <tr>
-            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/wifi-fix">wifi-fix</a></td>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/wifi-fix"><code>wifi-fix</code></a></td>
             <td><span class="mono">1.1.0</span></td>
-            <td>Intel Wi-Fi 7 BE211 — iwlmld power, ASPM, offload tweaks</td>
+            <td>Wi-Fi 7 BE211 stability — iwlmld + ASPM + offload tweaks</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/display-fix"><code>display-fix</code></a></td>
+            <td><span class="mono">1.1.1</span></td>
+            <td>xe driver Panel Replay lockup — kernel cmdline disable</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/intel-perf-fix"><code>intel-perf-fix</code></a></td>
+            <td><span class="mono">1.0.0</span></td>
+            <td>Panther Lake idle/thermal — thermald + intel-lpmd</td>
           </tr>
         </tbody>
       </table>
+
+      <h3 style="margin-top: 36px">Module deep dives</h3>
+
+      <details>
+        <summary><code>touchpad-fix</code> — pressure axis mis-parsed by hid-multitouch</summary>
+        <p>
+          The kernel's HID descriptor parser inflates <code>ABS_MT_PRESSURE</code> max to
+          <strong>2601</strong> — literally the Y-axis max value, suggesting a parser typo
+          — for this PixArt haptic touchpad. Real hardware values top out around 1000.
+          libinput's pressure thresholds are calibrated against the kernel-reported max,
+          so real touches register at 1–6% of the bogus max — well below the activation
+          threshold. Result: every motion is rejected as a "kernel bug: Touch jump."
+        </p>
+        <pre class="term"><code>$ sudo dmesg | grep "Touch jump" | wc -l
+1873      ← without the module
+0         ← with the module</code></pre>
+        <p>
+          <strong>Files installed:</strong>
+        </p>
+        <ul>
+          <li><code>/etc/udev/hwdb.d/61-pixart-4f05-pressure-fix.hwdb</code> — clamps the pressure axes via <code>EVDEV_ABS_18</code> / <code>EVDEV_ABS_3A</code></li>
+          <li><code>/etc/libinput/local-overrides.quirks</code> — tells libinput to ignore pressure entirely (<code>AttrEventCode=-ABS_MT_PRESSURE;-ABS_PRESSURE</code>)</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>audio-fix</code> — three things stacked</summary>
+        <ol>
+          <li>Cirrus CS35L56 amps boot in <code>FIRMWARE_MISSING</code> because <code>linux-firmware-cirrus &lt; 20260410</code> doesn't ship per-OEM blobs for PCI subsystem <code>1043:15e4</code>.</li>
+          <li>ALSA UCM has no codec dir for <code>cs42l43-spk+cs35l56</code>.</li>
+          <li>WirePlumber falls back to <code>stereo-fallback</code> which never reaches the speaker output PCM.</li>
+        </ol>
+        <pre class="term"><code>$ sudo dmesg | grep cs35l56
+cs35l56 sdw:0:2:01fa:3556:01:0: FIRMWARE_MISSING                    ← without
+cs35l56 sdw:0:2:01fa:3556:01:1: FIRMWARE_MISSING                    ← without
+─────────────────────────────────────────────────────────────────────────
+cs35l56 sdw:0:2:01fa:3556:01:0: Calibration applied                 ← with
+cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200  ← with</code></pre>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code> — per-OEM tuning blobs (from upstream linux-firmware)</li>
+          <li><code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.wmfw</code> — generic CS35L56 Rev 3.13.4 firmware patch (chip ROM upgrades 3.4.4 → 3.13.4)</li>
+          <li><code>/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/init.conf</code> — combined codec init</li>
+          <li><code>/etc/wireplumber/wireplumber.conf.d/51-asus-expertbook-pro-audio.conf</code> — Pro Audio pin + sink renames + suspend disable</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>wifi-fix</code> — three independent failure modes, three knobs</summary>
+        <p>
+          <code>iwlmld</code> defaults to <code>power_scheme=2</code> (balanced),
+          missing beacons on marginal SNR. PCIe ASPM L1.x wake latency on
+          integrated CNVi cards trips 802.11 timeouts. <code>iwlwifi</code>'s
+          TX-segmentation offload has a long-standing bug producing
+          <code>Microcode SW error</code> + 10-second freezes.
+        </p>
+        <pre class="term"><code>$ sudo dmesg | grep -E "missed beacons|Microcode SW error" | wc -l
+2046      ← without the module
+0         ← with the module (over 4h of mixed use)</code></pre>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/etc/modprobe.d/iwlmld-active.conf</code> — <code>options iwlmld power_scheme=1</code></li>
+          <li><code>/etc/tmpfiles.d/pcie-aspm-performance.conf</code> — global ASPM = performance at boot</li>
+          <li><code>/etc/NetworkManager/dispatcher.d/90-iwlwifi-no-offload</code> — <code>ethtool -K $iface tso off gso off gro off</code> on every iwlwifi up</li>
+        </ul>
+        <p>
+          Bluetooth coex (<code>bt_coex_active=Y</code>) is left untouched. Wi-Fi 7 / 6 GHz / 320 MHz / EHT-MCS rates remain exactly as the card prefers.
+        </p>
+      </details>
+
+      <details>
+        <summary><code>display-fix</code> — xe driver Panel Replay handshake hangs</summary>
+        <p>
+          The Samsung Display Corp panel reports IEEE OUI <code>00:aa:01</code>
+          in DPCD register 0x300 and supports Panel Replay Selective Update
+          (Early Transport). The xe driver's PSR idle wait times out on this
+          panel firmware:
+        </p>
+        <pre class="term"><code>xe 0000:00:02.0: [drm] *ERROR* Timed out waiting PSR idle state
+xe 0000:00:02.0: [drm] *ERROR* [CRTC:151:pipe A] DSB 0 timed out waiting for idle
+kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></pre>
+        <p>
+          Once wedged, only a reboot recovers — modeset cycle, GPU reset, and
+          runtime PSR-disable via debugfs all fail to unstick the display
+          state buffer. Same pattern Intel addresses for Dell XPS 14/16 in
+          mainline (per-device disable in <code>intel_quirks.c</code>) — our
+          <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches"><code>upstream-patches/0001</code></a>
+          ports the same disable to our subsystem ID.
+        </p>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/etc/modprobe.d/xe-disable-psr.conf</code> — belt-and-suspenders for late module load</li>
+          <li>(managed block) <code>/etc/default/limine</code> — appends <code>xe.enable_psr=0 xe.enable_psr2_sel_fetch=0 xe.enable_panel_replay=0</code> to kernel cmdline; the post-install hook calls <code>limine-update</code></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>intel-perf-fix</code> — Panther Lake hybrid topology tuning</summary>
+        <p>
+          Without a userspace thermal daemon, the kernel's only lever is "cap
+          CPU frequency". On Panther Lake's hybrid topology (P + E + LP-E
+          cores) a P/E-aware throttle is far smarter — it can park work on
+          slower cores instead of slowing everything down. Without
+          <code>intel-lpmd</code>, idle work spreads; with it, all idle work
+          concentrates on a single LP-E core and P-cores deep-sleep.
+        </p>
+        <p><strong>Packages installed (no payload files):</strong></p>
+        <ul>
+          <li><code>thermald</code> (extra repo) — <code>thermald.service</code> enabled</li>
+          <li><code>intel-lpmd</code> (AUR via paru/yay) — <code>intel_lpmd.service</code> enabled</li>
+        </ul>
+        <p>
+          Both daemons coexist with the existing <code>power-profiles-daemon</code>:
+          PPD handles user profile, thermald handles thermal, intel-lpmd handles
+          idle topology. Different layers, no conflict.
+        </p>
+      </details>
     </div>
   </section>
 
@@ -505,12 +722,11 @@ sudo reboot</code></pre>
     <div class="wrap">
       <h2>The patcher</h2>
       <p class="sub">
-        <code>patch.sh</code> is a small bash module manager.
-        Each module declares <code>MODULE_FILES</code>,
-        <code>MODULE_VERSION</code>, and optional pre/post hooks. The
-        patcher records the installed version under
-        <code>/var/lib/asus_expertboot_patcher</code> and flags updates
-        whenever the source <code>MODULE_VERSION</code> bumps.
+        <code>patch.sh</code> is a small bash module manager (~500 lines).
+        Each subfolder containing a <code>module.sh</code> manifest is a
+        discoverable module. The patcher records the installed version
+        under <code>/var/lib/asus_expertboot_patcher/</code> so subsequent
+        operations know whether each module needs an update.
       </p>
 
       <div class="grid grid-2">
@@ -521,7 +737,7 @@ sudo reboot</code></pre>
 ./patch.sh status         # detailed
 ./patch.sh diff           # source vs installed
 ./patch.sh install &lt;mod&gt;  # idempotent (also "update")
-./patch.sh update-all     # only re-installs out-of-date modules
+./patch.sh update-all     # only re-installs out-of-date
 ./patch.sh uninstall &lt;mod&gt;</code></pre>
         </article>
         <article class="card">
@@ -541,21 +757,67 @@ sudo reboot</code></pre>
     </div>
   </section>
 
+  <section id="upstream">
+    <div class="wrap">
+      <h2>Upstream submissions</h2>
+      <p class="sub">
+        The repo ships three submission-ready patches that turn each module
+        into a permanent upstream entry, structurally identical to existing
+        Dell / Lenovo / ASUS Zenbook quirks already accepted by the relevant
+        trees. When all three land upstream, the corresponding modules become
+        deletable.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>#</th><th>Tree</th><th>Replaces</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="mono">0001</span></td>
+            <td><code>drivers/gpu/drm/i915/display/intel_quirks.c</code></td>
+            <td><code>display-fix</code>'s cmdline workaround</td>
+          </tr>
+          <tr>
+            <td><span class="mono">0002</span></td>
+            <td><code>sound/soc/intel/boards/sof_sdw.c</code></td>
+            <td>most of <code>audio-fix</code> (UCM hack + Pro Audio pin)</td>
+          </tr>
+          <tr>
+            <td><span class="mono">0003</span></td>
+            <td><code>libinput/quirks/30-vendor-pixart.quirks</code></td>
+            <td><code>touchpad-fix</code>'s libinput override</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top: 24px">
+        All three dry-run apply cleanly against current
+        <code>torvalds/linux</code> master, <code>drm-intel-next</code>, and
+        libinput main respectively. See
+        <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches">
+          <code>upstream-patches/README.md</code></a>
+        for the hardware identifiers used, mailing list addresses, and
+        submission instructions.
+      </p>
+    </div>
+  </section>
+
   <section id="faq">
     <div class="wrap">
       <h2>FAQ</h2>
 
       <details>
-        <summary>Why not just upstream the fixes?</summary>
+        <summary>Does this work on similar 2026 ExpertBook Ultra models?</summary>
         <p>
-          They will be — these are workarounds for upstream gaps. The
-          touchpad needs a libinput quirk and a kernel HID parser fix.
-          The audio needs <code>cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.{wmfw,bin}</code>
-          shipped in <code>linux-firmware</code> and a real
-          <code>cs42l43-spk+cs35l56</code> codec dir in
-          <code>alsa-ucm-conf</code>. The Wi-Fi tweaks should become driver
-          defaults once the iwlmld stack matures. When all three land
-          upstream, this whole repo becomes deletable.
+          Most of it transfers. The <code>audio-fix</code> firmware blobs are
+          matched on PCI subsystem <code>1043:15e4</code> (this exact laptop).
+          Sibling subsystems <code>104315d4</code> and <code>104315f4</code>
+          ship different per-OEM tuning files in upstream
+          <code>linux-firmware</code>. The <code>touchpad-fix</code>,
+          <code>wifi-fix</code>, <code>display-fix</code>, and
+          <code>intel-perf-fix</code> modules are largely transferable. PRs
+          adding sibling-model entries are welcome.
         </p>
       </details>
 
@@ -563,64 +825,85 @@ sudo reboot</code></pre>
         <summary>Does this break Bluetooth?</summary>
         <p>
           No. The Wi-Fi module deliberately leaves
-          <code>iwlwifi.bt_coex_active=Y</code> alone. BT audio, HID, and
-          file transfer keep working as usual.
+          <code>iwlwifi.bt_coex_active=Y</code> alone. Bluetooth audio, HID,
+          and file transfer keep working as usual.
         </p>
       </details>
 
       <details>
-        <summary>Does this downgrade Wi-Fi 7 to Wi-Fi 6?</summary>
+        <summary>Does this downgrade Wi-Fi 7?</summary>
         <p>
-          No. The card stays on Wi-Fi 7 / 6 GHz / 320 MHz wherever the AP
-          and signal allow it. The wifi-fix only disables the driver-side
-          power-save loop, the L1.x ASPM wake latency, and the buggy
-          TX-segmentation offload — none of which limits link speed.
+          No. Wi-Fi 7 / 6 GHz / 320 MHz / EHT-MCS rates stay exactly as the
+          card prefers. The wifi-fix only disables the driver-side power-save
+          loop, the L1.x ASPM wake latency, and the buggy TX-segmentation
+          offload — none of which limits link speed.
         </p>
       </details>
 
       <details>
         <summary>What about the F1 mute LED?</summary>
         <p>
-          Still stays in the EC firmware default. The UCM
-          <code>SetLED</code> hook only fires under a HiFi UCM profile,
-          and we route through Pro Audio because the HiFi profile for
-          <code>cs42l43-spk+cs35l56</code> doesn't exist upstream yet.
-          Cosmetic, doesn't affect actual audio.
+          Currently still in the EC firmware default state because audio
+          routes through the Pro Audio profile (which bypasses UCM
+          <code>SetLED</code> hooks). Once
+          <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches">
+            <code>upstream-patches/0002</code></a> lands and the kernel
+          selects a HiFi UCM profile for our card, the existing
+          <code>SetLED</code> bindings in
+          <code>/usr/share/alsa/ucm2/codecs/cs35l56/init.conf</code> will
+          attach the LED to the AMP switches automatically and F1 will work.
         </p>
       </details>
 
       <details>
-        <summary>Will this work on similar ASUS models?</summary>
+        <summary>Why not just upstream all of this and skip the repo?</summary>
         <p>
-          The audio-fix's firmware files are matched on PCI subsystem
-          <code>1043:15e4</code> (this exact laptop). Sibling models
-          <code>104315d4</code> and <code>104315f4</code> would need
-          their own firmware bins — but the rest of the patcher
-          (touchpad and Wi-Fi) is largely transferable. PRs welcome.
+          That's the goal — see
+          <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches">
+            <code>upstream-patches/</code></a>. Until those land in
+          <code>torvalds/linux</code> master, <code>linux-firmware</code>
+          ships with the right files in the right places, and
+          <code>alsa-ucm-conf</code> ships the
+          <code>cs42l43-spk+cs35l56</code> codec dir, this repo is the
+          gap-filler. When all of that is upstream and your distro picks it
+          up, every module here becomes deletable.
         </p>
       </details>
 
       <details>
-        <summary>Where does the CS35L56 firmware come from?</summary>
+        <summary>Is this safe to install on a working setup?</summary>
         <p>
-          Both <code>.bin</code> files are upstream
-          <a href="https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/cirrus">linux-firmware</a>
-          (<code>cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code>).
-          The <code>.wmfw</code> is the generic
-          <code>cs35l56/CS35L56_Rev3.13.4.wmfw</code> renamed into the
-          per-OEM filename pattern the cs35l56 driver looks for. The
-          dmesg banner shows the firmware was built by Cirrus for ASUS
-          B9406CAA.
+          Yes. Every module is reversible (<code>./patch.sh uninstall &lt;mod&gt;</code>
+          removes the files it placed and reverts service enables). All file
+          targets are well-known config paths (<code>/etc/modprobe.d</code>,
+          <code>/etc/udev/hwdb.d</code>, <code>/etc/libinput</code>,
+          <code>/lib/firmware</code>, <code>/usr/share/alsa</code>,
+          <code>/etc/wireplumber/wireplumber.conf.d</code>,
+          <code>/etc/NetworkManager/dispatcher.d</code>) — no kernel binary
+          replacement, no pacman lock manipulation, no boot partition
+          rewriting except the cmdline injection in
+          <code>display-fix</code>'s case (which is also fully reversible
+          via the uninstall hook).
         </p>
       </details>
 
       <details>
-        <summary>Add my model / adjacent fix?</summary>
+        <summary>How do I test changes before installing?</summary>
+        <pre><code>./patch.sh diff &lt;module&gt;
+# shows source vs installed for every file the module manages,
+# marked unchanged / would update / would create</code></pre>
+      </details>
+
+      <details>
+        <summary>Where's the project licensed?</summary>
         <p>
-          Open an issue or a PR. The module format is intentionally
-          tiny — a folder with <code>module.sh</code>, the files, and
-          a README. Look at <code>touchpad-fix/module.sh</code> as the
-          smallest example.
+          <a href="https://github.com/burakgon/asus-expertbook-linux/blob/main/LICENSE">MIT</a>
+          for code (scripts, configs, patches). Firmware blobs under
+          <code>audio-fix/</code> are redistributed verbatim from upstream
+          <a href="https://gitlab.com/kernel-firmware/linux-firmware">
+            linux-firmware</a> under their original Cirrus Logic
+          redistribution license; see
+          <a href="https://github.com/burakgon/asus-expertbook-linux/blob/main/NOTICE">NOTICE</a>.
         </p>
       </details>
     </div>
@@ -631,8 +914,8 @@ sudo reboot</code></pre>
 <footer>
   <div class="wrap foot-row">
     <div>
-      <strong>asus-expertbook-linux</strong> · MIT licensed.
-      Firmware files redistributed from upstream
+      <strong>asus-expertbook-linux</strong> · MIT.
+      Firmware redistributed from upstream
       <a href="https://gitlab.com/kernel-firmware/linux-firmware">linux-firmware</a>
       under their original terms.
     </div>
