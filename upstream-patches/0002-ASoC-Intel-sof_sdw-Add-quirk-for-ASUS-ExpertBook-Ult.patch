@@ -1,48 +1,40 @@
 From: burakgon <burakgon12@gmail.com>
 Subject: [PATCH] ASoC: Intel: sof_sdw: Add SOC_SDW_SIDECAR_AMPS quirk for ASUS ExpertBook Ultra B9406CAA
 
-The 2026 ASUS ExpertBook Ultra (B9406CAA, Panther Lake) ships the same
-SoundWire codec topology that Dell SKU 0DD6 already has a quirk for: a
-Cirrus CS42L43 headset/codec on link 3 plus two CS35L56 sidecar speaker
-amplifiers on link 2 (PCI subsystem 0x1043:0x15e4).
+The 2026 ASUS ExpertBook Ultra B9406CAA (Panther Lake, PCI subsystem
+0x1043:0x15e4) has a CS42L43 codec on SoundWire link 3 and two CS35L56
+sidecar speaker amplifiers on SoundWire link 2. The SOF topology
+sof-ptl-cs42l43-agg-l3-cs35l56-l2.tplg loads correctly, but without a
+quirk entry the sof_sdw machine driver does not flag the sidecar amps,
+so ALSA UCM cannot match the resulting card to a HiFi profile and
+WirePlumber falls back to "stereo-fallback" which never reaches the
+cs35l56 output path. End-user symptom: speakers silent through PipeWire
+even when direct ALSA playback to plughw:0,2 produces sound.
 
-Without SOC_SDW_SIDECAR_AMPS the topology blob is selected correctly
-(sof-ptl-cs42l43-agg-l3-cs35l56-l2.tplg loads), and once the OEM-specific
-firmware blobs land in linux-firmware (cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.{wmfw,bin})
-the amps engage, but ALSA UCM cannot match the resulting card to a HiFi
-profile because no sof_sdw quirk flag was set for it. WirePlumber falls
-back to "stereo-fallback" and the speaker sink never reaches the cs35l56
-output path. End-user symptom: speakers silent through PipeWire even when
-direct ALSA playback to plughw:0,2 produces sound.
+Mirror the existing Lenovo 0x3821 entry — same SOC_SDW_SIDECAR_AMPS flag
+applied via PCI subsystem ID matching in sof_sdw_ssid_quirk_table.
+Other ASUS systems already in this table (Zenbook S14/S16) use
+SOC_SDW_CODEC_MIC because they have no sidecar amps; ours is
+structurally closer to the Lenovo P1/P16 + Dell PTL/CS42L43 systems
+that combine cs42l43 with cs35l56 amps.
 
-Mirror the existing Dell PTL+CS42L43 quirk; the only change is the DMI
-match. SOC_SDW_SIDECAR_AMPS is the correct flag for this exact codec
-topology.
-
-Tested on ASUS ExpertBook Ultra B9406CAA, Linux 7.x.
+Tested on:
+  - ASUS ExpertBook Ultra B9406CAA (Panther Lake)
+  - Linux 7.x with the per-OEM firmware
+    cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.{wmfw,bin} in /lib/firmware
 
 Signed-off-by: burakgon <burakgon12@gmail.com>
 ---
- sound/soc/intel/boards/sof_sdw.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ sound/soc/intel/boards/sof_sdw.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/sound/soc/intel/boards/sof_sdw.c b/sound/soc/intel/boards/sof_sdw.c
 --- a/sound/soc/intel/boards/sof_sdw.c
 +++ b/sound/soc/intel/boards/sof_sdw.c
-@@ -780,6 +780,14 @@ static const struct dmi_system_id sof_sdw_quirk_table[] = {
- 		},
- 		.driver_data = (void *)(SOC_SDW_SIDECAR_AMPS),
- 	},
-+	{
-+		.callback = sof_sdw_quirk_cb,
-+		.matches = {
-+			DMI_MATCH(DMI_SYS_VENDOR, "ASUS"),
-+			DMI_EXACT_MATCH(DMI_PRODUCT_NAME, "ASUS EXPERTBOOK B9406CAA")
-+		},
-+		.driver_data = (void *)(SOC_SDW_SIDECAR_AMPS),
-+	},
- 	{
- 		.callback = sof_sdw_quirk_cb,
- 		.matches = {
---
-2.49.0
+@@ -844,6 +844,7 @@ static const struct snd_pci_quirk sof_sdw_ssid_quirk_table[] = {
+ 	SND_PCI_QUIRK(0x1043, 0x1e13, "ASUS Zenbook S14", SOC_SDW_CODEC_MIC),
+ 	SND_PCI_QUIRK(0x1043, 0x1f43, "ASUS Zenbook S16", SOC_SDW_CODEC_MIC),
++	SND_PCI_QUIRK(0x1043, 0x15e4, "ASUS ExpertBook Ultra B9406CAA", SOC_SDW_SIDECAR_AMPS),
+ 	SND_PCI_QUIRK(0x17aa, 0x2347, "Lenovo P16", SOC_SDW_CODEC_MIC),
+ 	SND_PCI_QUIRK(0x17aa, 0x2348, "Lenovo P16", SOC_SDW_CODEC_MIC),
+ 	SND_PCI_QUIRK(0x17aa, 0x2349, "Lenovo P1", SOC_SDW_CODEC_MIC),

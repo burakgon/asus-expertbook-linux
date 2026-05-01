@@ -45,5 +45,3 @@ diff --git a/quirks/30-vendor-pixart.quirks b/quirks/30-vendor-pixart.quirks
 +MatchVendor=0x093A
 +MatchProduct=0x4F05
 +AttrEventCode=-ABS_MT_PRESSURE;-ABS_PRESSURE;
---
-2.49.0

@@ -48,5 +48,3 @@ diff --git a/drivers/gpu/drm/i915/display/intel_quirks.c b/drivers/gpu/drm/i915/
  };
 
  void intel_init_quirks(struct intel_display *display)
---
-2.49.0
