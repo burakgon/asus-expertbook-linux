@@ -54,6 +54,7 @@ parts of `intel-perf-fix` are Arch-specific.
 | **Samsung Display Corp** eDP panel + Intel **`xe`** driver (Xe3 Panther Lake iGPU) | **Internal panel goes black.** `kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver`. eDP-1 wedges, only reboot recovers. | Internal display stable indefinitely. PSR / Panel Replay disabled cleanly at boot. | [`display-fix`](display-fix/) |
 | **Intel Core Ultra X7/X9** Panther Lake hybrid (P + E + LP-E cores) | **Idle power 4–5 W**, fans audible at idle, P-cores never deep-sleep. | Idle ≈ 2–2.5 W. Workload parks on a single LP-E core. P-cores reach `C10`. | [`intel-perf-fix`](intel-perf-fix/) |
 | **Intel Panther Lake NPU** (`8086:b03e`) + USB UVC webcam | **No AI camera effects.** Windows Studio Effects (background blur, smart framing, voice focus) doesn't exist on Linux out of the box. | Same effects via OBS + `obs-backgroundremoval` plugin, exposed as a virtual camera ("AI Camera") that any chat app can use. NPU-acceleration available with `paru -S openvino`. | [`webcam-ai-fix`](webcam-ai-fix/) |
+| **ASUS BIOS `SLKB` ACPI method** (BIOS `B9406CAA.304`) | **Keyboard backlight slider in KDE does nothing.** `SLKB` clamps `Local0 = Zero` for the standard 0..3 brightness range that the kernel asus-wmi driver writes — so EC always gets brightness 0. Direct writes to `/sys/class/leds/asus::kbd_backlight/brightness` silently no-op. | KDE keyboard-brightness slider works. `asusd` userspace daemon translates kernel writes into the OEM-tested `0x100..0x103` range, which the BIOS handles correctly. | [`keyboard-backlight-fix`](keyboard-backlight-fix/) |
 
 > **Nothing this repo installs is a band-aid in the bad sense.** Every module
 > uses the exact same upstream-recognised mechanism (udev hwdb, libinput
@@ -77,7 +78,7 @@ After reboot:
 ./patch.sh status
 ```
 
-You should see all six modules `up to date` and their runtime checks green.
+You should see all seven modules `up to date` and their runtime checks green.
 
 ### Or pick à la carte
 
@@ -325,6 +326,52 @@ tracks file-based modules (versioned, idempotent, status-checked).
 
 </details>
 
+### 7. [`keyboard-backlight-fix`](keyboard-backlight-fix/) — work around the BIOS `SLKB` clamp bug
+
+<details><summary><b>The bug</b> — ASUS BIOS clamps every kernel-side brightness write to zero</summary>
+
+The B9406CAA BIOS (`B9406CAA.304`) ships a broken `SLKB` ACPI method.
+Disassembled from the live DSDT:
+
+```c
+Method (SLKB, 1, NotSerialized) {
+    If    ((Arg0 >= 0x0100) && (Arg0 <= 0x0106)) { Local0 = (Arg0 - 0x0100) }
+    ElseIf((Arg0 >= 0x80)   && (Arg0 <= 0x83))   { Local0 = (Arg0 - 0x80) * 0x21 ... }
+    ElseIf((Arg0 >= Zero)   && (Arg0 <= 0x03))   { Local0 = Zero }   // ← BUG
+    STBC (Zero, Local0)
+    Return (One)
+}
+```
+
+The mainline `asus-wmi` Linux driver writes the standard `0..3` kernel
+range, which hits the third branch — and it **unconditionally clamps
+`Local0` to zero** before passing to STBC (the EC command emitter). End
+result: every KDE / `brightnessctl` / direct `/sys` write is silently
+turned into "set brightness 0", and the keyboard backlight stays off.
+
+The OEM-tested `0x100..0x103` range works correctly. Verified by hand
+via `acpi_call`: invoking `\_SB.PC00.LPCB.EC0.SLKB 0x103` lights the
+backlight.
+
+</details>
+
+<details><summary><b>The fix</b> — let the asusd userspace daemon translate the value range</summary>
+
+| File / package | Path | What it does |
+|---|---|---|
+| `xyz.ljones.Asusd.service` | `/usr/share/dbus-1/system-services/` | D-Bus activation entry for `asusd`. The `asusd.service` systemd unit is `Type=dbus`, but ASUS doesn't ship the matching D-Bus service file — without it nothing ever auto-starts the daemon. |
+| `acpi_call.conf` | `/etc/modules-load.d/` | Auto-load the `acpi_call` kernel module so `/proc/acpi/call` is available for direct ACPI invocations during debugging. |
+| `asusctl` package | `extra` repo | Provides the `asusd` daemon. |
+| `acpi_call-dkms` package | AUR | Optional. Kernel module exposing `/proc/acpi/call`. |
+| `/etc/asusd/` directory | (created in post_install) | `asusd` refuses to start without it; the package leaves it absent. |
+
+`asusd` translates standard kernel-level brightness writes into the
+OEM-tested `0x100..0x103` range before invoking ACPI, side-stepping the
+buggy branch. KDE PowerDevil's keyboard-brightness control then reaches
+the EC correctly.
+
+</details>
+
 ## How it works
 
 The whole project is a small bash module manager (`patch.sh`, ~500 lines)
@@ -340,6 +387,7 @@ asus-expertbook-linux/
 │   └── …                       # payload files
 ├── display-fix/  …
 ├── intel-perf-fix/  …
+├── keyboard-backlight-fix/  …
 ├── touchpad-fix/  …
 ├── webcam-ai-fix/  …
 ├── wifi-fix/  …
@@ -444,9 +492,9 @@ Most of it transfers. The `audio-fix` firmware blobs are matched on PCI
 subsystem `1043:15e4` (this exact laptop). Sibling subsystems
 `104315d4` and `104315f4` ship different per-OEM tuning files in
 upstream `linux-firmware`. The `touchpad-fix`, `wifi-fix`,
-`display-fix`, `intel-perf-fix`, and `webcam-ai-fix` modules are
-hardware-agnostic or match by family-level identifiers and apply
-more broadly.
+`display-fix`, `intel-perf-fix`, `webcam-ai-fix`, and
+`keyboard-backlight-fix` modules are hardware-agnostic or match by
+family-level identifiers and apply more broadly.
 
 PRs adding `module.sh` entries for sibling models are welcome.
 

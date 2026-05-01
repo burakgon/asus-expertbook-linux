@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — six modules: touchpad, audio, wifi, display, perf, webcam AI">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — seven modules: touchpad, audio, wifi, display, perf, webcam AI, keyboard backlight">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ASUS ExpertBook Ultra B9406CAA on Linux">
@@ -374,7 +374,7 @@
       <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
       <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
       <p class="lede">
-        Six surgical, versioned, fully-reversible userspace patches that turn
+        Seven surgical, versioned, fully-reversible userspace patches that turn
         the 2026 ASUS ExpertBook Ultra (B9406CAA) into a working Linux laptop —
         without rebuilding the kernel, without downgrading hardware features,
         and without breaking any of the things that already work.
@@ -545,6 +545,25 @@ Result: install-all is appropriate for this hardware.</code></pre>
           </div>
         </div>
       </div>
+
+      <div class="ba-block">
+        <div class="ba-hw"><strong>ASUS BIOS <code>SLKB</code> ACPI method</strong> (BIOS <span class="mono">B9406CAA.304</span>)</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — keyboard backlight</strong>
+            KDE slider does nothing; <code>/sys/class/leds/asus::kbd_backlight/brightness</code>
+            writes silently no-op. Firmware <code>SLKB</code> method clamps
+            standard 0..3 range to zero before passing to EC.
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>keyboard-backlight-fix</code></strong>
+            KDE slider works. <code>asusd</code> userspace daemon translates
+            kernel writes into the OEM-tested <span class="mono">0x100..0x103</span>
+            range that the firmware handles correctly.
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -579,8 +598,9 @@ sudo reboot</code></pre>
   2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
   3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
   4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
-  5   webcam-ai-fix      1.0.1    1.0.1     up to date     OBS + bg-removal + v4l2loopback
-  6   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
+  5   keyboard-backlight-fix 1.0.0 1.0.0    up to date     SLKB BIOS bug → asusd D-Bus
+  6   webcam-ai-fix      1.0.1    1.0.1     up to date     OBS + bg-removal + v4l2loopback
+  7   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
 
 Actions
   i &lt;num&gt;    install / update module
@@ -602,7 +622,7 @@ Actions
 
   <section id="modules">
     <div class="wrap">
-      <h2>The six modules</h2>
+      <h2>The seven modules</h2>
       <p class="sub">
         Each is a self-contained folder with a manifest, a payload, and a
         README. Click any module to open the bug story and the file-level
@@ -643,6 +663,11 @@ Actions
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/webcam-ai-fix"><code>webcam-ai-fix</code></a></td>
             <td><span class="mono">1.0.1</span></td>
             <td>AI camera stack — OBS + obs-backgroundremoval + v4l2loopback (NPU optional)</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/keyboard-backlight-fix"><code>keyboard-backlight-fix</code></a></td>
+            <td><span class="mono">1.0.0</span></td>
+            <td>BIOS <code>SLKB</code> ACPI bug — userspace <code>asusd</code> translates kernel range to OEM range</td>
           </tr>
         </tbody>
       </table>
@@ -801,6 +826,55 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           "AI Camera" as a webcam choice.
         </p>
       </details>
+
+      <details>
+        <summary><code>keyboard-backlight-fix</code> — BIOS <code>SLKB</code> firmware bug, userspace workaround</summary>
+        <p>
+          On BIOS <code>B9406CAA.304</code>, the <code>SLKB</code> ACPI method
+          that sets keyboard-backlight brightness has a broken branch.
+          Disassembled from the live DSDT:
+        </p>
+        <pre><code>Method (SLKB, 1, NotSerialized) {
+    If    ((Arg0 &gt;= 0x0100) &amp;&amp; (Arg0 &lt;= 0x0106)) { Local0 = (Arg0 - 0x0100) }
+    ElseIf((Arg0 &gt;= 0x80)   &amp;&amp; (Arg0 &lt;= 0x83))   { Local0 = (Arg0 - 0x80) * 0x21 ... }
+    ElseIf((Arg0 &gt;= Zero)   &amp;&amp; (Arg0 &lt;= 0x03))   { Local0 = Zero }   // ← BUG
+    STBC (Zero, Local0)
+    Return (One)
+}</code></pre>
+        <p>
+          The mainline <code>asus-wmi</code> Linux driver writes the standard
+          kernel range <code>0..3</code> to set keyboard brightness. That hits
+          the third branch which <strong>unconditionally clamps
+          <code>Local0</code> to zero</strong>. The EC dutifully applies
+          "brightness = 0", and the keyboard backlight stays off forever no
+          matter what KDE / <code>brightnessctl</code> / direct
+          <code>/sys/class/leds/</code> writes do. The OEM-tested
+          <code>0x100..0x103</code> range works correctly.
+        </p>
+        <p>
+          <strong>Workaround</strong>: the userspace daemon <code>asusd</code>
+          (shipped in <code>asusctl</code>) translates standard kernel-level
+          brightness writes into the OEM range before invoking ACPI,
+          side-stepping the buggy branch. Once <code>asusd</code> is running,
+          KDE PowerDevil's keyboard-brightness control reaches the EC
+          correctly.
+        </p>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/usr/share/dbus-1/system-services/xyz.ljones.Asusd.service</code> — D-Bus activation entry that ASUS doesn't ship; without it <code>asusd.service</code> (Type=dbus) never auto-starts</li>
+          <li><code>/etc/modules-load.d/acpi_call.conf</code> — auto-load <code>acpi_call</code> for any direct ACPI fallback debugging</li>
+          <li><code>/etc/asusd/</code> directory — <code>asusd</code> refuses to start without it; pacman package leaves it absent</li>
+        </ul>
+        <p><strong>Packages installed:</strong></p>
+        <ul>
+          <li><code>asusctl</code> (extra) — provides the <code>asusd</code> daemon</li>
+          <li><code>acpi_call-dkms</code> (AUR, manual) — kernel module for direct ACPI invocations during debugging</li>
+        </ul>
+        <p>
+          If a future ASUS BIOS revision fixes the <code>SLKB</code> branch,
+          this entire module becomes redundant — uninstall it.
+        </p>
+      </details>
     </div>
   </section>
 
@@ -902,9 +976,9 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           ship different per-OEM tuning files in upstream
           <code>linux-firmware</code>. The <code>touchpad-fix</code>,
           <code>wifi-fix</code>, <code>display-fix</code>,
-          <code>intel-perf-fix</code>, and <code>webcam-ai-fix</code>
-          modules are largely transferable. PRs adding sibling-model
-          entries are welcome.
+          <code>intel-perf-fix</code>, <code>webcam-ai-fix</code>, and
+          <code>keyboard-backlight-fix</code> modules are largely
+          transferable. PRs adding sibling-model entries are welcome.
         </p>
       </details>
 

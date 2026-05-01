@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=xyz.ljones.Asusd
+Exec=/usr/bin/asusd
+User=root
+SystemdService=asusd.service
