@@ -146,14 +146,18 @@ mod_remove_files() {
 }
 
 # echoes "all" / "some" / "none"
+# An empty MODULE_FILES is treated as "all" (vacuously installed) — used by
+# hook-only modules whose payload is package installs, not files.
 mod_files_state() {
   local entry dst found=0 total=0
-  for entry in "${MODULE_FILES[@]}"; do
+  for entry in "${MODULE_FILES[@]:-}"; do
+    [[ -z $entry ]] && continue
     dst="${entry#*:}"
     total=$(( total + 1 ))
     [[ -e $dst ]] && found=$(( found + 1 ))
   done
-  if   (( found == 0 ));     then echo none
+  if   (( total == 0 ));     then echo all
+  elif (( found == 0 ));     then echo none
   elif (( found == total )); then echo all
   else echo some
   fi
