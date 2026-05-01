@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — seven modules: touchpad, audio, wifi, display, perf, webcam AI, keyboard backlight">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — eight modules: touchpad, audio, wifi, display + HDR, perf, webcam AI, keyboard backlight">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ASUS ExpertBook Ultra B9406CAA on Linux">
@@ -374,7 +374,7 @@
       <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
       <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
       <p class="lede">
-        Seven surgical, versioned, fully-reversible userspace patches that turn
+        Eight surgical, versioned, fully-reversible userspace patches that turn
         the 2026 ASUS ExpertBook Ultra (B9406CAA) into a working Linux laptop —
         without rebuilding the kernel, without downgrading hardware features,
         and without breaking any of the things that already work.
@@ -564,6 +564,28 @@ Result: install-all is appropriate for this hardware.</code></pre>
           </div>
         </div>
       </div>
+
+      <div class="ba-block">
+        <div class="ba-hw"><strong>Samsung Display ATNA40LE01-0</strong> OLED panel + Intel <code>xe</code> driver</div>
+        <div class="ba-row">
+          <div class="ba-cell ba-bad">
+            <strong>Before — HDR on the panel</strong>
+            <code>xe</code> reads 0 bytes from the eDP DDC channel.
+            <code>kscreen-doctor</code> reports <em>HDR: incapable</em>,
+            <em>WCG: incapable</em>, max luminance 200&nbsp;cd/m².
+            YouTube AV1-HDR videos tone-map down to SDR (Rec.709 / gamma22).
+          </div>
+          <div class="ba-arrow">→</div>
+          <div class="ba-cell ba-good">
+            <strong>After — <code>display-hdr-fix</code></strong>
+            ASUS-supplied panel EDID injected via
+            <code>drm.edid_firmware</code>.
+            KDE sees DCI-P3 + BT.2020/SMPTE ST 2084, 700 / 1600&nbsp;cd/m² peak,
+            12 bpc native. HDR toggle becomes available; YouTube HDR plays
+            with the full PQ curve.
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -598,9 +620,10 @@ sudo reboot</code></pre>
   2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
   3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
   4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
-  5   keyboard-backlight-fix 1.0.0 1.0.0    up to date     SLKB BIOS bug → asusd D-Bus
-  6   webcam-ai-fix      1.0.1    1.0.1     up to date     OBS + bg-removal + v4l2loopback
-  7   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
+  5   display-hdr-fix    1.0.0    1.0.0     up to date     panel EDID inject → HDR/DCI-P3
+  6   keyboard-backlight-fix 1.0.0 1.0.0    up to date     SLKB BIOS bug → asusd D-Bus
+  7   webcam-ai-fix      1.0.1    1.0.1     up to date     OBS + bg-removal + v4l2loopback
+  8   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
 
 Actions
   i &lt;num&gt;    install / update module
@@ -622,7 +645,7 @@ Actions
 
   <section id="modules">
     <div class="wrap">
-      <h2>The seven modules</h2>
+      <h2>The eight modules</h2>
       <p class="sub">
         Each is a self-contained folder with a manifest, a payload, and a
         README. Click any module to open the bug story and the file-level
@@ -668,6 +691,11 @@ Actions
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/keyboard-backlight-fix"><code>keyboard-backlight-fix</code></a></td>
             <td><span class="mono">1.0.0</span></td>
             <td>BIOS <code>SLKB</code> ACPI bug — userspace <code>asusd</code> translates kernel range to OEM range</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/display-hdr-fix"><code>display-hdr-fix</code></a></td>
+            <td><span class="mono">1.0.0</span></td>
+            <td>xe driver fails DDC EDID — inject ASUS-supplied panel EDID, restore DCI-P3 + HDR PQ pipeline</td>
           </tr>
         </tbody>
       </table>
@@ -828,6 +856,58 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
       </details>
 
       <details>
+        <summary><code>display-hdr-fix</code> — restore the OLED panel's HDR / DCI-P3 capability</summary>
+        <p>
+          The B9406CAA ships a Samsung Display
+          <strong>ATNA40LE01-0</strong> OLED panel: 2880×1800 @ 120 Hz,
+          12 bpc native, DCI-P3 gamut, BT.2020 / SMPTE ST 2084 (HDR PQ) EOTF,
+          700 cd/m² full-coverage and 1600 cd/m² peak luminance. DisplayHDR
+          True Black 1000 class.
+        </p>
+        <p>
+          KWin Wayland in Plasma 6.6+ already exposes
+          <code>wp_color_manager_v1</code> with the full HDR pipeline
+          (PQ ST2084 transfer function, <code>set_luminances</code>,
+          named primaries up to BT.2020). But the <code>xe</code> driver
+          fails to read the panel EDID via DDC/AUX —
+          <code>/sys/class/drm/card0-eDP-1/edid</code> returns 0 bytes.
+          Without metadata, KDE marks the display SDR-only:
+        </p>
+        <pre><code>$ kscreen-doctor -o | grep -E 'HDR|Wide'
+    HDR: incapable
+    Wide Color Gamut: incapable</code></pre>
+        <p>
+          The whole pipeline downgrades — YouTube AV1-HDR tone-maps to
+          SDR, 8-bit colour, sRGB clipping on DCI-P3 content, max
+          luminance pinned at 200 cd/m².
+        </p>
+        <p>
+          ASUS thoughtfully stashes the panel's full EDID — including the
+          DisplayID 2.0 extension block with all the HDR specs — in an EFI
+          variable named
+          <code>AsusEDID-607005d5-3f75-4b2e-98f0-85ba66797a3e</code> (256
+          bytes after the 4-byte attribute prefix). This module ships a
+          one-time extraction of that EDID and tells DRM to use it via
+          firmware override.
+        </p>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/usr/lib/firmware/edid/asus-b9406-edid.bin</code> — the 256-byte EDID payload, SHA256-verified against the live EFI variable on every install (warns loudly if a BIOS update changes the panel EDID)</li>
+          <li><code>/etc/default/limine</code> — appends <code>drm.edid_firmware=eDP-1:edid/asus-b9406-edid.bin</code> to the kernel cmdline (regenerated by <code>limine-update</code>)</li>
+        </ul>
+        <p>
+          After reboot, <code>kscreen-doctor -o</code> reports
+          <em>HDR: capable</em> and <em>Wide Color Gamut: capable</em>;
+          System Settings → Display → "Enable HDR" toggle becomes
+          available. With Vivaldi, also enable
+          <code>vivaldi://flags</code> → <em>Enable HDR Mode</em> +
+          <em>Vulkan</em>; YouTube → "Stats for nerds" then shows
+          <code>bt2020</code> / <code>smpte2084</code> instead of
+          <code>bt709</code> / <code>gamma22</code> for HDR videos.
+        </p>
+      </details>
+
+      <details>
         <summary><code>keyboard-backlight-fix</code> — BIOS <code>SLKB</code> firmware bug, userspace workaround</summary>
         <p>
           On BIOS <code>B9406CAA.304</code>, the <code>SLKB</code> ACPI method
@@ -978,7 +1058,10 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           <code>wifi-fix</code>, <code>display-fix</code>,
           <code>intel-perf-fix</code>, <code>webcam-ai-fix</code>, and
           <code>keyboard-backlight-fix</code> modules are largely
-          transferable. PRs adding sibling-model entries are welcome.
+          transferable. The <code>display-hdr-fix</code> EDID payload
+          is panel-specific (Samsung ATNA40LE01-0) and only helps
+          B9406CAA SKUs that ship the same OLED. PRs adding
+          sibling-model entries are welcome.
         </p>
       </details>
 
