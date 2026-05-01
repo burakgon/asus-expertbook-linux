@@ -53,6 +53,7 @@ parts of `intel-perf-fix` are Arch-specific.
 | **Wi-Fi 7 BE211 link unstable.** Kernel log spams `missed beacons exceeds threshold, but receiving data`. Throughput drops, occasional `Microcode SW error` 10 second freezes. | Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam. No freezes under heavy load. | [`wifi-fix`](wifi-fix/) |
 | **Internal panel goes black.** `kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver`. eDP-1 wedges, only reboot recovers. | Internal display stable indefinitely. PSR / Panel Replay disabled cleanly at boot. | [`display-fix`](display-fix/) |
 | **Idle power 4–5 W**, fans audible at idle, P-cores never deep-sleep. | Idle ≈ 2–2.5 W. Workload parks on a single LP-E core. P-cores reach `C10`. | [`intel-perf-fix`](intel-perf-fix/) |
+| **No AI camera effects.** Windows Studio Effects (background blur, smart framing, voice focus) doesn't exist on Linux out of the box. | Same effects via OBS + `obs-backgroundremoval` plugin, exposed as a virtual camera ("AI Camera") that any chat app can use. NPU-acceleration available with `paru -S openvino`. | [`webcam-ai-fix`](webcam-ai-fix/) |
 
 > **Nothing this repo installs is a band-aid in the bad sense.** Every module
 > uses the exact same upstream-recognised mechanism (udev hwdb, libinput
@@ -76,7 +77,7 @@ After reboot:
 ./patch.sh status
 ```
 
-You should see all five modules `up to date` and their runtime checks green.
+You should see all six modules `up to date` and their runtime checks green.
 
 ### Or pick à la carte
 
@@ -255,7 +256,46 @@ no-op and can be uninstalled.
 
 </details>
 
-### 5. [`intel-perf-fix`](intel-perf-fix/) — Panther Lake idle / thermal
+### 5. [`webcam-ai-fix`](webcam-ai-fix/) — Linux equivalent of Windows Studio Effects
+
+<details><summary><b>The gap</b> — no Linux equivalent shipped on Panther Lake "AI PC" laptops</summary>
+
+Windows Studio Effects on Copilot+ PCs runs background blur, smart framing,
+eye-contact correction, and voice focus on the NPU. None of these are
+shipped on Linux out of the box, even though the Intel Panther Lake NPU
+itself is fully supported by the kernel (`intel_vpu` driver,
+`/dev/accel/accel0` exposed) and the userspace stack (OpenVINO 2026,
+level-zero) is available in the repos.
+
+Without this module the NPU sits idle, the webcam feed has no AI
+processing, and there's no virtual-cam target for video chat apps to
+read from.
+
+</details>
+
+<details><summary><b>The fix</b> — OBS pipeline + virtual cam + ML segmentation plugin</summary>
+
+| File / package | Source | What it does |
+|---|---|---|
+| `v4l2loopback.conf` | `/etc/modules-load.d/` | Auto-load v4l2loopback at boot |
+| `v4l2loopback-options.conf` | `/etc/modprobe.d/` | Persistent device config (`devices=1 video_nr=10 card_label='AI Camera' exclusive_caps=1`) |
+| `v4l2loopback-dkms` package | `extra` | Kernel module providing the virtual cam |
+| `obs-studio` package | `extra` | Capture + filter graph + virtual-cam writer |
+| `obs-backgroundremoval` package | AUR | ML segmentation OBS plugin (ONNX models, can target NPU via OpenVINO) |
+| `openvino` (optional) | AUR | Intel's official AI inference toolkit; enables NPU acceleration. ~30 min compile from source. |
+
+The user is also added to the `render` group as defensive future-proofing
+for stricter NPU device permissions. `/dev/accel/accel0` ships
+world-writable today.
+
+After install, the user opens OBS, adds a Video Capture Device source
+pointing at the real webcam, attaches the Background Removal filter,
+and starts the virtual camera. Any video chat app then sees the
+processed feed as "AI Camera".
+
+</details>
+
+### 6. [`intel-perf-fix`](intel-perf-fix/) — Panther Lake idle / thermal
 
 <details><summary><b>The bug</b> — kernel-default thermal throttle and idle scheduling are coarse on Panther Lake</summary>
 
@@ -301,6 +341,7 @@ asus-expertbook-linux/
 ├── display-fix/  …
 ├── intel-perf-fix/  …
 ├── touchpad-fix/  …
+├── webcam-ai-fix/  …
 ├── wifi-fix/  …
 ├── upstream-patches/           # submission-ready upstream patches
 │   └── 0001…0003.patch
@@ -403,8 +444,9 @@ Most of it transfers. The `audio-fix` firmware blobs are matched on PCI
 subsystem `1043:15e4` (this exact laptop). Sibling subsystems
 `104315d4` and `104315f4` ship different per-OEM tuning files in
 upstream `linux-firmware`. The `touchpad-fix`, `wifi-fix`,
-`display-fix`, and `intel-perf-fix` modules are donanım-bağımsız or
-match by family-level identifiers and apply more broadly.
+`display-fix`, `intel-perf-fix`, and `webcam-ai-fix` modules are
+hardware-agnostic or match by family-level identifiers and apply
+more broadly.
 
 PRs adding `module.sh` entries for sibling models are welcome.
 

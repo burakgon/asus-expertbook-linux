@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — five modules: touchpad, audio, wifi, display, perf">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — six modules: touchpad, audio, wifi, display, perf, webcam AI">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ASUS ExpertBook Ultra B9406CAA on Linux">
@@ -366,7 +366,7 @@
       <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
       <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
       <p class="lede">
-        Five surgical, versioned, fully-reversible userspace patches that turn
+        Six surgical, versioned, fully-reversible userspace patches that turn
         the 2026 ASUS ExpertBook Ultra (B9406CAA) into a working Linux laptop —
         without rebuilding the kernel, without downgrading hardware features,
         and without breaking any of the things that already work.
@@ -503,6 +503,22 @@ Result: install-all is appropriate for this hardware.</code></pre>
           P-cores reach <code>C10</code>.
         </div>
       </div>
+
+      <div class="ba-row">
+        <div class="ba-cell ba-bad">
+          <strong>Before — AI camera effects</strong>
+          No Linux equivalent of Windows Studio Effects.
+          NPU sits idle, no virtual cam, no background blur / smart framing /
+          voice focus shipped out of the box.
+        </div>
+        <div class="ba-arrow">→</div>
+        <div class="ba-cell ba-good">
+          <strong>After — <code>webcam-ai-fix</code></strong>
+          OBS pipeline + <code>obs-backgroundremoval</code> plugin + virtual
+          cam (<code>/dev/video10</code> "AI Camera"). NPU acceleration when
+          OpenVINO is added.
+        </div>
+      </div>
     </div>
   </section>
 
@@ -537,7 +553,8 @@ sudo reboot</code></pre>
   2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
   3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
   4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
-  5   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
+  5   webcam-ai-fix      1.0.1    1.0.1     up to date     OBS + bg-removal + v4l2loopback
+  6   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
 
 Actions
   i &lt;num&gt;    install / update module
@@ -559,7 +576,7 @@ Actions
 
   <section id="modules">
     <div class="wrap">
-      <h2>The five modules</h2>
+      <h2>The six modules</h2>
       <p class="sub">
         Each is a self-contained folder with a manifest, a payload, and a
         README. Click any module to open the bug story and the file-level
@@ -595,6 +612,11 @@ Actions
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/intel-perf-fix"><code>intel-perf-fix</code></a></td>
             <td><span class="mono">1.0.0</span></td>
             <td>Panther Lake idle/thermal — thermald + intel-lpmd</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/webcam-ai-fix"><code>webcam-ai-fix</code></a></td>
+            <td><span class="mono">1.0.1</span></td>
+            <td>AI camera stack — OBS + obs-backgroundremoval + v4l2loopback (NPU optional)</td>
           </tr>
         </tbody>
       </table>
@@ -715,6 +737,44 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           idle topology. Different layers, no conflict.
         </p>
       </details>
+
+      <details>
+        <summary><code>webcam-ai-fix</code> — Linux equivalent of Windows Studio Effects</summary>
+        <p>
+          Windows Studio Effects on Copilot+ PCs runs background blur, smart
+          framing, eye-contact correction, and voice focus on the NPU. None
+          of these are shipped on Linux out of the box, even though the
+          Intel Panther Lake NPU itself is fully supported by the kernel
+          (<code>intel_vpu</code> driver, <code>/dev/accel/accel0</code>) and
+          OpenVINO 2026 is in the AUR.
+        </p>
+        <p>
+          This module bundles the userspace plumbing: a virtual camera
+          target via <code>v4l2loopback</code>, OBS Studio as the capture +
+          filter pipeline, and the <code>obs-backgroundremoval</code>
+          plugin which runs ONNX models — falls back to CPU/TFLite by
+          default, can target the NPU when <code>openvino</code> is added.
+        </p>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/etc/modules-load.d/v4l2loopback.conf</code> — auto-load at boot</li>
+          <li><code>/etc/modprobe.d/v4l2loopback-options.conf</code> — <code>devices=1 video_nr=10 card_label='AI Camera' exclusive_caps=1</code></li>
+        </ul>
+        <p><strong>Packages installed:</strong></p>
+        <ul>
+          <li><code>v4l2loopback-dkms</code> (extra) — kernel module</li>
+          <li><code>obs-studio</code> (extra) — orchestrator</li>
+          <li><code>obs-backgroundremoval</code> (AUR) — ML segmentation plugin</li>
+          <li><code>openvino</code> (AUR, optional) — Intel inference toolkit, NPU acceleration. ~30 min compile.</li>
+        </ul>
+        <p>
+          Use: open OBS, add a Video Capture Device source pointing at the
+          real webcam, attach the <em>Background Removal</em> filter, set
+          inference device to NPU (if openvino is installed), and start the
+          virtual camera (Tools → Start Virtual Camera). Apps then see
+          "AI Camera" as a webcam choice.
+        </p>
+      </details>
     </div>
   </section>
 
@@ -815,9 +875,10 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           Sibling subsystems <code>104315d4</code> and <code>104315f4</code>
           ship different per-OEM tuning files in upstream
           <code>linux-firmware</code>. The <code>touchpad-fix</code>,
-          <code>wifi-fix</code>, <code>display-fix</code>, and
-          <code>intel-perf-fix</code> modules are largely transferable. PRs
-          adding sibling-model entries are welcome.
+          <code>wifi-fix</code>, <code>display-fix</code>,
+          <code>intel-perf-fix</code>, and <code>webcam-ai-fix</code>
+          modules are largely transferable. PRs adding sibling-model
+          entries are welcome.
         </p>
       </details>
 
