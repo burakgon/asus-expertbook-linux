@@ -52,10 +52,11 @@
 
 MODULE_NAME="display-hdr-fix"
 MODULE_DESC="Inject ASUS-supplied panel EDID so xe driver exposes HDR / DCI-P3 to KDE"
-MODULE_VERSION="1.0.0"
+MODULE_VERSION="1.0.2"
 
 MODULE_FILES=(
   "asus-b9406-edid.bin:/usr/lib/firmware/edid/asus-b9406-edid.bin"
+  "asus-b9406-edid.mkinitcpio.conf:/etc/mkinitcpio.conf.d/asus-b9406-edid.conf"
 )
 
 readonly _DH_LIMINE_CONF="/etc/default/limine"
@@ -63,7 +64,12 @@ readonly _DH_BEGIN="# >>> asus-expertbook-linux display-hdr-fix >>>"
 readonly _DH_END="# <<< asus-expertbook-linux display-hdr-fix <<<"
 readonly _DH_CMDLINE='KERNEL_CMDLINE[default]+=" drm.edid_firmware=eDP-1:edid/asus-b9406-edid.bin"'
 readonly _DH_EFI_VAR="/sys/firmware/efi/efivars/AsusEDID-607005d5-3f75-4b2e-98f0-85ba66797a3e"
-readonly _DH_EDID_SHA="841655f043ac8984f40c8393f6224aa75d34ae51c0c2c5d4faa9b6565685014f"
+# EDID we ship is patched: ASUS's stored EDID claims 2 extension blocks
+# but ships only 1 (256 byte file), which xe rejects as Invalid. We
+# fix byte 126 = 0x01 and recompute base-block checksum (byte 127). The
+# raw EFI variable bytes are different from this — that's fine.
+readonly _DH_EDID_SHA="6609e337dfe7aec217b3fb2e444cd50fc62d9fac18611e30198a74c1544df1c2"
+readonly _DH_EFI_RAW_SHA="841655f043ac8984f40c8393f6224aa75d34ae51c0c2c5d4faa9b6565685014f"
 
 _dh_block_present() {
   [[ -f "$_DH_LIMINE_CONF" ]] && grep -qF "$_DH_BEGIN" "$_DH_LIMINE_CONF"
@@ -123,18 +129,32 @@ _dh_regen_limine() {
   fi
 }
 
+_dh_regen_initramfs() {
+  # The EDID firmware has to be baked into initramfs because xe loads in
+  # early KMS (before rootfs is mounted). The drop-in file at
+  # /etc/mkinitcpio.conf.d/asus-b9406-edid.conf appends the EDID to FILES,
+  # so a plain `mkinitcpio -P` is enough to embed it.
+  if command -v mkinitcpio >/dev/null 2>&1; then
+    echo "  regenerating initramfs via mkinitcpio -P (embeds EDID for early KMS)"
+    if ! mkinitcpio -P >/dev/null 2>&1; then
+      echo "  warn: mkinitcpio -P exited non-zero — early KMS may still miss the EDID"
+    fi
+  else
+    echo "  warn: mkinitcpio not found — initramfs NOT regenerated"
+  fi
+}
+
 _dh_verify_efi_match() {
-  # Sanity check: confirm the EDID we ship still matches what ASUS has in
-  # EFI on this machine. If a BIOS update changes the panel EDID, we
-  # should ship a new module version with the new payload, not silently
-  # let users boot a stale firmware override.
+  # Sanity check: confirm the raw ASUS-stored EDID on this system still
+  # matches what we patched our shipped file from. If a BIOS update
+  # changes the EDID payload, the patched file we ship is stale.
   if [[ -r "$_DH_EFI_VAR" ]]; then
     local efi_sha
     efi_sha="$(dd if="$_DH_EFI_VAR" bs=1 skip=4 status=none 2>/dev/null | sha256sum | awk '{print $1}')"
-    if [[ "$efi_sha" != "$_DH_EDID_SHA" ]]; then
-      echo "  warn: shipped EDID does NOT match EFI variable on this system"
-      echo "        shipped: $_DH_EDID_SHA"
-      echo "        EFI:     $efi_sha"
+    if [[ "$efi_sha" != "$_DH_EFI_RAW_SHA" ]]; then
+      echo "  warn: ASUS EFI EDID payload differs from the version we patched"
+      echo "        shipped (raw source): $_DH_EFI_RAW_SHA"
+      echo "        EFI on this system:   $efi_sha"
       echo "        BIOS may have been updated; please report at"
       echo "        https://github.com/burakgon/asus-expertbook-linux/issues"
     fi
@@ -144,6 +164,7 @@ _dh_verify_efi_match() {
 module_post_install() {
   _dh_verify_efi_match
   _dh_append_block
+  _dh_regen_initramfs
   _dh_regen_limine
   echo
   echo "Reboot to apply. After boot:"
@@ -154,6 +175,7 @@ module_post_install() {
 
 module_post_uninstall() {
   _dh_remove_block
+  _dh_regen_initramfs
   _dh_regen_limine
   echo
   echo "Reboot to revert. xe will retry DDC EDID readback on the next"
@@ -179,6 +201,18 @@ module_status_extra() {
       printf '  EDID sysfs: %s%d bytes (xe driver sees panel)%s\n' "$c_ok" "$sz" "$c_off"
     else
       printf '  EDID sysfs: %s%d bytes (xe failed to read; firmware override required)%s\n' "$c_warn" "$sz" "$c_off"
+    fi
+  fi
+
+  # Sanity-check that EDID is in the running initramfs — early KMS can't
+  # see anything outside the cpio archive.
+  local running_initramfs
+  running_initramfs="/boot/initramfs-linux-$(uname -r | sed 's/-[0-9]*-cachyos.*//;s/-cachyos.*//').img"
+  if [[ -f "$running_initramfs" ]] && command -v lsinitcpio >/dev/null 2>&1; then
+    if lsinitcpio "$running_initramfs" 2>/dev/null | grep -q 'edid/asus-b9406'; then
+      printf '  initramfs:  %sEDID embedded in current initramfs%s\n' "$c_ok" "$c_off"
+    else
+      printf '  initramfs:  %sEDID NOT embedded — run %ssudo mkinitcpio -P%s and reboot%s\n' "$c_warn" "$c_dim" "$c_warn" "$c_off"
     fi
   fi
 
