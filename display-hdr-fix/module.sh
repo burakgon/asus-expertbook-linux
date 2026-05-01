@@ -52,7 +52,7 @@
 
 MODULE_NAME="display-hdr-fix"
 MODULE_DESC="Inject ASUS-supplied panel EDID so xe driver exposes HDR / DCI-P3 to KDE"
-MODULE_VERSION="1.0.2"
+MODULE_VERSION="1.0.3"
 
 MODULE_FILES=(
   "asus-b9406-edid.bin:/usr/lib/firmware/edid/asus-b9406-edid.bin"
@@ -68,7 +68,7 @@ readonly _DH_EFI_VAR="/sys/firmware/efi/efivars/AsusEDID-607005d5-3f75-4b2e-98f0
 # but ships only 1 (256 byte file), which xe rejects as Invalid. We
 # fix byte 126 = 0x01 and recompute base-block checksum (byte 127). The
 # raw EFI variable bytes are different from this — that's fine.
-readonly _DH_EDID_SHA="6609e337dfe7aec217b3fb2e444cd50fc62d9fac18611e30198a74c1544df1c2"
+readonly _DH_EDID_SHA="9e27a00a58e392d8a4485ed2b0ad0f1986759bc36d2f6b3906a3640346b1ce32"
 readonly _DH_EFI_RAW_SHA="841655f043ac8984f40c8393f6224aa75d34ae51c0c2c5d4faa9b6565685014f"
 
 _dh_block_present() {
