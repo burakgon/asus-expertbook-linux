@@ -157,17 +157,23 @@ is loaded.
 
 </details>
 
-### 2. [`audio-fix`](audio-fix/) — speakers, mics, clean sound panel
+### 2. [`audio-fix`](audio-fix/) — speakers, headphones, mics (HiFi UCM)
 
-<details><summary><b>The bug</b> — three things stacked</summary>
+<details><summary><b>The bug</b> — firmware, a UCM gap, and topology noise</summary>
 
-1. The Cirrus CS35L56 speaker amps boot in `FIRMWARE_MISSING` state because
-   `linux-firmware-cirrus < 20260410` doesn't ship the per-OEM `.bin` /
-   `.wmfw` files for PCI subsystem `1043:15e4`.
-2. ALSA UCM has no codec directory for the `cs42l43-spk+cs35l56` codec
-   string this card advertises in `alsa.components`.
-3. With both above, WirePlumber falls back to a generic `stereo-fallback`
-   profile that doesn't route to the speaker output PCM at all.
+1. The Cirrus CS35L56 speaker amps need per-OEM tuning firmware. As of
+   `linux-firmware-cirrus >= 20260519` it ships upstream for `1043:15e4`; on
+   anything older the amps boot `FIRMWARE_MISSING` and the bundled blobs fill in.
+2. The card reports a **combined** sidecar-amp codec — `spk:cs35l56+cs42l43-spk`
+   (or two `spk:` tags on older kernels). Stock `alsa-ucm-conf 1.2.15.x` has no
+   UCM dir for it **and** its `SpeakerCodec` regex drops the trailing `-spk`, so
+   `alsaucm` fails (`codecs/cs35l56+cs42l43/init.conf: -2`). WirePlumber then
+   uses `stereo-fallback`, which plays to the **Jack** PCM (device 0), not the
+   **Speaker** PCM (device 2) — silent speakers, even though `aplay -D plughw:0,2`
+   works.
+3. The generic SOF topology declares an unused `SSP2-BT` hardware-offload PCM
+   with no firmware blob; WirePlumber's probe of it spams the kernel log
+   (~40% of all kernel errors at boot).
 
 ```
 $ sudo dmesg | grep cs35l56
@@ -180,14 +186,22 @@ cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200  ← with
 
 </details>
 
-<details><summary><b>The fix</b> — firmware blobs + UCM init + Pro Audio profile pin</summary>
+<details><summary><b>The fix</b> — HiFi UCM + cs35l56 firmware (replaces the old pro-audio pin)</summary>
+
+The proper fix is the upstream **HiFi UCM**, not a profile hack — named ports,
+headphone-jack **auto-switching**, working volume + mic-mute LED, and it becomes
+native once Arch ships `alsa-ucm-conf >= 1.2.16`.
 
 | File | Path | What it does |
 |---|---|---|
-| `cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin` | `/lib/firmware/cirrus/` | Per-OEM tuning blobs from upstream `linux-firmware`, applied to each amp via the chip's DSP. |
-| `cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.wmfw` | `/lib/firmware/cirrus/` | Generic CS35L56 firmware patch (Rev 3.13.4) renamed to per-OEM filename pattern so the chip ROM upgrades from 3.4.4 to 3.13.4. |
-| `cs42l43-spk+cs35l56/init.conf` | `/usr/share/alsa/ucm2/codecs/` | Combined codec init that maps abstract speaker controls to concrete `AMP1` / `AMP2` switches. |
-| `51-asus-expertbook-pro-audio.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Pins the SoundWire card to the Pro Audio profile so PipeWire exposes a discrete Speaker sink. Hides Bluetooth + Deepbuffer noise. Renames raw PCMs to "Speaker (Internal)", "HDMI 1/2/3", "Headset Mic", "Internal Microphone". Sets `session.suspend-timeout-seconds=0` on the Speaker sink to avoid first-playback corruption. |
+| `cs35l56-…-l2u{0,1}.{bin,wmfw}` | `/lib/firmware/cirrus/` | Per-OEM tuning + ROM 3.4.4→3.13.4 patch. **Fallback** — `linux-firmware-cirrus >= 20260519` now ships these. |
+| `sof-soundwire.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | Upstream `alsa-ucm-conf` master: fixes the `SpeakerCodec` regex to keep the `-spk` suffix. `module.sh` pins it via `NoExtract` so package upgrades don't revert it. |
+| `cs35l56+cs42l43-spk.conf`, `cs42l43-spk+cs35l56.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | The Speaker device for the combined codec — routes playback to `hw:,2` and the CS35L56 + CS42L43 amps. |
+| `cs42l43-spk+cs35l56-init.conf` | `/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/` | Combined codec init (control remap + LED attach). `module.sh` symlinks `cs35l56+cs42l43-spk` → this so both kernel names resolve. |
+| `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log. Bluetooth audio (A2DP/HFP) still works via the PipeWire software path. |
+
+> The **F1 speaker-mute LED can't be fixed from Linux** — this laptop exposes no
+> speaker-mute LED device, only `platform::micmute` (which the HiFi UCM drives).
 
 </details>
 
