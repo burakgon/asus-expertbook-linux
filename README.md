@@ -104,7 +104,7 @@ typing single letters. Numbered table, color-coded state, cached.
 
   #   Module             Version  Installed State          Description
   -----------------------------------------------------------------------------
-  1   audio-fix          1.3.0    1.3.0     up to date     Speakers + mics + clean panel
+  1   audio-fix          2.1.0    2.1.0     up to date     Speakers + mics + clean panel
   2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
   3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
   4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
@@ -189,13 +189,16 @@ cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200  ← with
 <details><summary><b>The fix</b> — HiFi UCM + cs35l56 firmware (replaces the old pro-audio pin)</summary>
 
 The proper fix is the upstream **HiFi UCM**, not a profile hack — named ports,
-headphone-jack **auto-switching**, working volume + mic-mute LED, and it becomes
-native once Arch ships `alsa-ucm-conf >= 1.2.16`.
+headphone-jack **auto-switching**, working volume + mic-mute LED. **It's upstream
+as of `alsa-ucm-conf 1.2.16`**, so on 1.2.16+ this module installs only the
+firmware + the SSP2-BT drop-in; the UCM rows below are dropped in **only as a
+fallback on `alsa-ucm-conf < 1.2.16`** (and the `NoExtract` pin is removed
+automatically once the package crosses 1.2.16).
 
 | File | Path | What it does |
 |---|---|---|
 | `cs35l56-…-l2u{0,1}.{bin,wmfw}` | `/lib/firmware/cirrus/` | Per-OEM tuning + ROM 3.4.4→3.13.4 patch. **Fallback** — `linux-firmware-cirrus >= 20260519` now ships these. |
-| `sof-soundwire.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | Upstream `alsa-ucm-conf` master: fixes the `SpeakerCodec` regex to keep the `-spk` suffix. `module.sh` pins it via `NoExtract` so package upgrades don't revert it. |
+| `sof-soundwire.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | Upstream `alsa-ucm-conf` master: fixes the `SpeakerCodec` regex to keep the `-spk` suffix. Pinned via `NoExtract` so a partial upgrade can't revert it (both only on `alsa-ucm-conf < 1.2.16`). |
 | `cs35l56+cs42l43-spk.conf`, `cs42l43-spk+cs35l56.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | The Speaker device for the combined codec — routes playback to `hw:,2` and the CS35L56 + CS42L43 amps. |
 | `cs42l43-spk+cs35l56-init.conf` | `/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/` | Combined codec init (control remap + LED attach). `module.sh` symlinks `cs35l56+cs42l43-spk` → this so both kernel names resolve. |
 | `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log. Bluetooth audio (A2DP/HFP) still works via the PipeWire software path. |
@@ -557,7 +560,7 @@ that turn each module into a permanent upstream entry:
 | # | Tree | Replaces |
 |---|---|---|
 | `0001` | `drivers/gpu/drm/i915/display/intel_quirks.c` | `display-fix`'s cmdline workaround |
-| `0002` | `sound/soc/intel/boards/sof_sdw.c` | most of `audio-fix` (UCM hack + Pro Audio pin) |
+| `0002` | `sound/soc/intel/boards/sof_sdw.c` | most of `audio-fix` (combined-codec UCM routing) |
 | `0003` | `libinput/quirks/30-vendor-pixart.quirks` | `touchpad-fix`'s libinput override |
 
 All three dry-run apply cleanly against current `torvalds/linux` master /
@@ -609,22 +612,23 @@ none of which limits link speed.
 
 <details><summary><b>What about the F1 mute LED?</b></summary>
 
-Currently still in the EC firmware default state because we route audio
-through the Pro Audio profile (which bypasses UCM `SetLED` hooks).
-Once [`upstream-patches/0002`](upstream-patches/) lands and the kernel
-selects a HiFi UCM profile for our card, the existing `SetLED`
-bindings in `/usr/share/alsa/ucm2/codecs/cs35l56/init.conf` will
-attach the LED to the AMP switches automatically and F1 will work.
+The HiFi UCM (active since `audio-fix v2.0.0`, and upstream in
+`alsa-ucm-conf 1.2.16`) drives the **mic-mute** LED (`platform::micmute`)
+correctly. The **speaker-mute** LED (F1) stays in its EC default state
+because this laptop exposes no speaker-mute LED device to Linux at all —
+there's nothing for the UCM `SetLED` hook to bind to. It's a
+missing-device limitation, not a profile issue.
 
 </details>
 
 <details><summary><b>Why not just upstream all of this and skip the repo?</b></summary>
 
-That's the goal — see [`upstream-patches/`](upstream-patches/). Until
-those land in `torvalds/linux` master, `linux-firmware` ships with the
-right files in the right places, and `alsa-ucm-conf` ships the
-`cs42l43-spk+cs35l56` codec dir, this repo is the gap-filler. When all
-of that is upstream and your distro picks it up, every module here
+That's the goal — see [`upstream-patches/`](upstream-patches/). Two of the
+audio pieces already landed: `alsa-ucm-conf 1.2.16` ships the
+`cs42l43-spk+cs35l56` codec dir and `linux-firmware-cirrus >= 20260519`
+ships the OEM blobs, so on an up-to-date system `audio-fix` is already down
+to a single topology-noise drop-in. As the kernel/quirk patches in
+`upstream-patches/` land and your distro picks them up, every module here
 becomes deletable.
 
 </details>

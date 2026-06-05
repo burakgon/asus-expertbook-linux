@@ -1,48 +1,70 @@
-# ASUS ExpertBook Ultra (B9406CAA) — speaker audio fix on Linux
+# ASUS ExpertBook Ultra (B9406CAA) — speaker / headphone audio fix on Linux
 
-Out of the box, internal speakers are silent on Linux 6.18+ (and the F1 mute
-LED is stuck "on") because:
+Out of the box on Linux 6.18+, the internal speakers are silent (and the F1
+mute LED is stuck "on"). Three independent problems stack up:
 
-1. The Cirrus **CS35L56** speaker amplifiers boot in `FIRMWARE_MISSING` state.
-   `linux-firmware-cirrus` (2026‑03 and 2026‑04 packages) does not ship the
-   OEM tuning files for this laptop's PCI subsystem ID `1043:15e4`. Both
-   amps need a per‑OEM `.bin` (tuning) **and** a `.wmfw` (firmware patch
-   upgrading chip ROM `3.4.4` → `3.13.4`).
+1. **CS35L56 firmware missing.** The Cirrus **CS35L56** speaker amplifiers boot
+   in `FIRMWARE_MISSING` state. They each need a per-OEM `.bin` (tuning) **and**
+   a `.wmfw` (firmware patch upgrading chip ROM `3.4.4` → `3.13.4`).
+   `linux-firmware-cirrus >= 20260519` now ships these upstream for this
+   laptop's PCI subsystem ID `1043:15e4`; on anything older they're missing.
 
-2. ALSA UCM falls back to an unrouted `stereo-fallback` profile because the
-   codec directory `cs42l43-spk+cs35l56/` is missing under
-   `/usr/share/alsa/ucm2/codecs/`. The card declares
-   `spk:cs42l43-spk+cs35l56` in `alsa.components`, so libucm tries to load
-   `codecs/cs42l43-spk+cs35l56/init.conf` and gives up when it isn't there.
+2. **Combined sidecar-amp UCM gap.** The card reports a *combined* speaker
+   codec — `spk:cs35l56+cs42l43-spk` (or two `spk:` tags on older kernels:
+   2× CS35L56 + the CS42L43 sidecar amp). Stock `alsa-ucm-conf 1.2.15.x` has
+   **no UCM** for that combination **and** its `SpeakerCodec` regex drops the
+   trailing `-spk`, so `alsaucm` fails to open
+   (`codecs/cs35l56+cs42l43/init.conf: -2`). WirePlumber then falls back to an
+   unrouted `stereo-fallback` profile that plays to the **Jack** PCM (device 0),
+   not the **Speaker** PCM (device 2) — silent speakers, even though
+   `aplay -D plughw:0,2` works. **`alsa-ucm-conf 1.2.16` ships the fix upstream**
+   (the exact files below, verbatim).
 
-3. Even after firmware loads, WirePlumber sticks with the
-   `stereo-fallback` profile. None of its sinks reach the speaker amps.
+3. **Dead SSP2-BT topology node.** The generic SOF topology declares an unused
+   `SSP2-BT` hardware-offload PCM with no firmware blob; WirePlumber's probe of
+   it spams the kernel log (`SSP2-BT.capture: failed to prepare`, ~40% of all
+   kernel errors at boot).
 
-Confirmed reproducible on:
+## What this module does
 
-- ASUS ExpertBook Ultra (B9406CAA, 2026, Panther Lake, PCI subsystem `1043:15e4`)
-- Kernels: `linux-cachyos 7.0.2`, `linux-cachyos-rc 7.1.rc1`
-- `linux-firmware-cirrus 1:20260309-1` (cachyos), `20260410-1` (core)
-- `alsa-ucm-conf 1.2.15.3-1`
-- WirePlumber `0.5.14` / PipeWire `1.6.4`
+Installs the proper **HiFi UCM** profile (not a profile hack): named ports,
+headphone-jack **auto-switching**, working volume, and the mic-mute LED. The
+result is a real `HiFi__Speaker__sink` on PCM device 2 with all 6 speakers and
+the CS35L56 DSP running calibrated firmware.
+
+> **The UCM half is upstream as of `alsa-ucm-conf 1.2.16`.** On a system with
+> `alsa-ucm-conf >= 1.2.16` this module installs **no** files under
+> `/usr/share/alsa/ucm2` and adds **no** `NoExtract` pin — the UCM already
+> belongs to the package, and dropping our own copies in would only create a
+> pacman file-conflict on the next `alsa-ucm-conf` upgrade. There it is
+> effectively **firmware + SSP2-BT-noise-fix only**. The bundled UCM files are
+> kept purely as a fallback for systems still on `alsa-ucm-conf < 1.2.16`, where
+> `module_post_install` drops them in and pins `sof-soundwire.conf`.
 
 ## Files
 
+### Always installed
+
 | Source | Install path | Purpose |
 |---|---|---|
-| `cs35l56-b0-dsp1-misc-104315e4-l2u0.bin` | `/lib/firmware/cirrus/` | Per-OEM tuning blob, link 2 unit 0 (left amp) |
-| `cs35l56-b0-dsp1-misc-104315e4-l2u0.wmfw` | `/lib/firmware/cirrus/` | Firmware patch (ROM 3.4.4 → 3.13.4), left amp |
-| `cs35l56-b0-dsp1-misc-104315e4-l2u1.bin` | `/lib/firmware/cirrus/` | Per-OEM tuning, link 2 unit 1 (right amp) |
-| `cs35l56-b0-dsp1-misc-104315e4-l2u1.wmfw` | `/lib/firmware/cirrus/` | Firmware patch, right amp |
-| `cs42l43-spk+cs35l56-init.conf` | `/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/init.conf` | Combined codec init (control remap + LED attach) |
-| `51-asus-expertbook-pro-audio.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Pin card to `pro-audio` so Speaker sink is reachable |
+| `cs35l56-…-l2u0.bin` / `.wmfw` | `/lib/firmware/cirrus/` | Per-OEM tuning + ROM `3.4.4`→`3.13.4` patch, left amp. **Fallback** for `linux-firmware-cirrus < 20260519`. |
+| `cs35l56-…-l2u1.bin` / `.wmfw` | `/lib/firmware/cirrus/` | Same, right amp. |
+| `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log. A2DP/HFP Bluetooth still works via the PipeWire software path. |
 
-The `.bin` files come from the upstream `linux-firmware` repository
-([cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin](https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/cirrus)).
-The `.wmfw` is the generic `cs35l56/CS35L56_Rev3.13.4.wmfw` from the same repo,
-renamed into the per‑OEM filename pattern the cs35l56 driver looks for.
-The dmesg banner shows the file was actually built by Cirrus for ASUS
-B9406CAA (`Misc: ...\\Cirrus Logic\\...\\ASUS\\B9406CAA\\...`).
+### Installed only on `alsa-ucm-conf < 1.2.16` (otherwise the package provides them)
+
+| Source | Install path | Purpose |
+|---|---|---|
+| `sof-soundwire.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | Fixes the `SpeakerCodec` regex to keep the `-spk` suffix. Pinned via `NoExtract` so a partial upgrade can't revert it — until the upgrade crosses 1.2.16, where the pin is dropped automatically. |
+| `cs35l56+cs42l43-spk.conf`, `cs42l43-spk+cs35l56.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | The Speaker device for the combined codec — routes playback to `hw:,2` and the CS35L56 + CS42L43 amps. |
+| `cs42l43-spk+cs35l56-init.conf` | `/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/init.conf` | Combined codec init (control remap + LED attach). A `cs35l56+cs42l43-spk` symlink is created so both kernel codec names resolve. |
+
+The `.bin` / `.wmfw` blobs come verbatim from upstream
+[linux-firmware](https://gitlab.com/kernel-firmware/linux-firmware/-/tree/main/cirrus)
+(the `.wmfw` is the generic `CS35L56_Rev3.13.4.wmfw` renamed into the per-OEM
+filename the driver looks for). The UCM files come verbatim from upstream
+[alsa-ucm-conf](https://github.com/alsa-project/alsa-ucm-conf) master — the same
+content that shipped in release 1.2.16.
 
 ## Install
 
@@ -53,22 +75,25 @@ From the project root:
 sudo reboot
 ```
 
-After reboot, verify with:
+After reboot, verify:
 
 ```sh
 sudo dmesg | grep cs35l56
 # expect: "Calibration applied", no "FIRMWARE_MISSING", no "Can't read tuning IDs"
 
 pactl list cards | grep "Active Profile"
-# expect: Active Profile: pro-audio
+# expect: Active Profile: HiFi
 ```
 
-If the Speaker isn't already the default sink, set it once
-(WirePlumber persists it):
+If the Speaker isn't already the default sink, set it once (WirePlumber
+persists it):
 
 ```sh
-pactl set-default-sink alsa_output.pci-0000_00_1f.3-platform-sof_sdw.pro-output-2
+pactl set-default-sink alsa_output.pci-0000_00_1f.3-platform-sof_sdw.HiFi__Speaker__sink
 ```
+
+`./patch.sh status audio-fix` also reports the cs35l56 firmware state and the
+active card profile.
 
 ## Uninstall
 
@@ -77,25 +102,28 @@ pactl set-default-sink alsa_output.pci-0000_00_1f.3-platform-sof_sdw.pro-output-
 sudo reboot
 ```
 
+On `alsa-ucm-conf >= 1.2.16` the uninstall only removes the firmware blobs and
+the SSP2-BT drop-in — the HiFi UCM is left in place because it belongs to the
+package, not to this module.
+
 ## Known limitations
 
-- **F1 mute LED stays in EC firmware default state.** The UCM `SetLED`
-  binding in `cs42l43-spk+cs35l56-init.conf` only takes effect when a
-  HiFi UCM profile is active for the card; with `pro-audio` we bypass
-  UCM. A proper HiFi profile for this codec combination has to land
-  upstream in `alsa-ucm-conf` first.
-- **Pro Audio exposes 8 raw PCM sinks.** Other than Speaker
-  (`pro-output-2`), Jack (`pro-output-0`), HDMI (`pro-output-5/6/7`),
-  Bluetooth (`pro-output-20`), and Deepbuffer variants are also
-  visible. They share the card so most users will only ever pick
-  Speaker as default.
-- **Bluetooth audio capture errors** (`SSP2-BT.capture: failed to prepare`)
-  in dmesg are unrelated to this fix and predate it. They originate in
-  SOF's topology, not the speaker amps.
+- **F1 speaker-mute LED stays in its EC default state.** This laptop exposes no
+  speaker-mute LED device to Linux — only `platform::micmute`, which the HiFi
+  UCM *does* drive. There is nothing to bind the speaker-mute key to.
+- **The bundled cs35l56 blobs are a fallback.** On `linux-firmware-cirrus >=
+  20260519` the package already ships the `1043:15e4` tuning, so the bundled
+  copies are redundant (same filenames, same content).
 
 ## Upstream tracking
 
-Once upstream linux‑firmware adds a `cs35l56-b0-dsp1-misc-104315e4*.wmfw`
-file and `alsa-ucm-conf` ships a real `cs42l43-spk+cs35l56` codec dir
-(and a sof‑soundwire matcher that selects HiFi for it), this entire
-module becomes redundant — uninstall and remove.
+The two big pieces are now upstream:
+
+- **UCM:** shipped in `alsa-ucm-conf 1.2.16` (combined `cs42l43-spk+cs35l56`
+  codec dir + `sof-soundwire` `-spk` regex + the speaker confs). ✅
+- **Firmware:** shipped in `linux-firmware-cirrus >= 20260519` for `1043:15e4`. ✅
+
+On a fully up-to-date system the only thing this module still adds is the
+`52-disable-bt-sco-offload.conf` WirePlumber drop-in that silences the dead
+`SSP2-BT` topology node. Once that unused PCM is dropped from the SOF topology
+upstream, the module becomes fully redundant and can be uninstalled.
