@@ -616,7 +616,7 @@ sudo reboot</code></pre>
 
   #   Module             Version  Installed State          Description
   -----------------------------------------------------------------------------
-  1   audio-fix          1.3.0    1.3.0     up to date     Speakers + mics + clean panel
+  1   audio-fix          2.1.0    2.1.0     up to date     Speakers + mics + clean panel
   2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
   3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
   4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
@@ -664,8 +664,8 @@ Actions
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/audio-fix"><code>audio-fix</code></a></td>
-            <td><span class="mono">1.3.0</span></td>
-            <td>Cirrus CS35L56 firmware + UCM init + WirePlumber Pro Audio profile</td>
+            <td><span class="mono">2.1.0</span></td>
+            <td>Cirrus CS35L56 firmware + HiFi UCM (upstream in alsa-ucm-conf 1.2.16) + SSP2-BT noise fix</td>
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/wifi-fix"><code>wifi-fix</code></a></td>
@@ -727,9 +727,9 @@ Actions
       <details>
         <summary><code>audio-fix</code> — three things stacked</summary>
         <ol>
-          <li>Cirrus CS35L56 amps boot in <code>FIRMWARE_MISSING</code> because <code>linux-firmware-cirrus &lt; 20260410</code> doesn't ship per-OEM blobs for PCI subsystem <code>1043:15e4</code>.</li>
-          <li>ALSA UCM has no codec dir for <code>cs42l43-spk+cs35l56</code>.</li>
-          <li>WirePlumber falls back to <code>stereo-fallback</code> which never reaches the speaker output PCM.</li>
+          <li>Cirrus CS35L56 amps boot in <code>FIRMWARE_MISSING</code> because <code>linux-firmware-cirrus &lt; 20260519</code> doesn't ship per-OEM blobs for PCI subsystem <code>1043:15e4</code>.</li>
+          <li>The combined sidecar codec <code>cs35l56+cs42l43-spk</code> has no UCM in <code>alsa-ucm-conf &lt; 1.2.16</code>, and its <code>SpeakerCodec</code> regex drops the <code>-spk</code> suffix — so the UCM fails to open. (Fixed upstream in <code>alsa-ucm-conf 1.2.16</code>.)</li>
+          <li>WirePlumber then falls back to <code>stereo-fallback</code>, which plays to the Jack PCM, never the speaker output PCM.</li>
         </ol>
         <pre class="term"><code>$ sudo dmesg | grep cs35l56
 cs35l56 sdw:0:2:01fa:3556:01:0: FIRMWARE_MISSING                    ← without
@@ -737,12 +737,12 @@ cs35l56 sdw:0:2:01fa:3556:01:1: FIRMWARE_MISSING                    ← without
 ─────────────────────────────────────────────────────────────────────────
 cs35l56 sdw:0:2:01fa:3556:01:0: Calibration applied                 ← with
 cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200  ← with</code></pre>
-        <p><strong>Files installed:</strong></p>
+        <p><strong>Files installed (v2.1.0):</strong></p>
         <ul>
-          <li><code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code> — per-OEM tuning blobs (from upstream linux-firmware)</li>
+          <li><code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code> — per-OEM tuning blobs (fallback for <code>linux-firmware-cirrus &lt; 20260519</code>)</li>
           <li><code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.wmfw</code> — generic CS35L56 Rev 3.13.4 firmware patch (chip ROM upgrades 3.4.4 → 3.13.4)</li>
-          <li><code>/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/init.conf</code> — combined codec init</li>
-          <li><code>/etc/wireplumber/wireplumber.conf.d/51-asus-expertbook-pro-audio.conf</code> — Pro Audio pin + sink renames + suspend disable</li>
+          <li><code>/etc/wireplumber/wireplumber.conf.d/52-disable-bt-sco-offload.conf</code> — silences the dead SSP2-BT offload PCM that spams the kernel log</li>
+          <li><em>HiFi UCM — only on <code>alsa-ucm-conf &lt; 1.2.16</code> (1.2.16+ ships it in the package):</em> <code>sof-soundwire.conf</code> (fixed <code>-spk</code> regex), the <code>cs35l56+cs42l43-spk</code> / <code>cs42l43-spk+cs35l56</code> speaker confs, and <code>codecs/cs42l43-spk+cs35l56/init.conf</code></li>
         </ul>
       </details>
 
@@ -1021,7 +1021,7 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
           <tr>
             <td><span class="mono">0002</span></td>
             <td><code>sound/soc/intel/boards/sof_sdw.c</code></td>
-            <td>most of <code>audio-fix</code> (UCM hack + Pro Audio pin)</td>
+            <td>most of <code>audio-fix</code> (combined-codec UCM routing)</td>
           </tr>
           <tr>
             <td><span class="mono">0003</span></td>
@@ -1087,15 +1087,13 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
       <details>
         <summary>What about the F1 mute LED?</summary>
         <p>
-          Currently still in the EC firmware default state because audio
-          routes through the Pro Audio profile (which bypasses UCM
-          <code>SetLED</code> hooks). Once
-          <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches">
-            <code>upstream-patches/0002</code></a> lands and the kernel
-          selects a HiFi UCM profile for our card, the existing
-          <code>SetLED</code> bindings in
-          <code>/usr/share/alsa/ucm2/codecs/cs35l56/init.conf</code> will
-          attach the LED to the AMP switches automatically and F1 will work.
+          The HiFi UCM (active since <code>audio-fix v2.0.0</code>, and upstream
+          in <code>alsa-ucm-conf 1.2.16</code>) drives the <strong>mic-mute</strong>
+          LED (<code>platform::micmute</code>) correctly. The
+          <strong>speaker-mute</strong> LED (F1) stays in its EC default state
+          because this laptop exposes no speaker-mute LED device to Linux at all —
+          there's nothing for the UCM <code>SetLED</code> hook to bind to. It's a
+          missing-device limitation, not a profile issue.
         </p>
       </details>
 
@@ -1104,13 +1102,14 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver</code></
         <p>
           That's the goal — see
           <a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/upstream-patches">
-            <code>upstream-patches/</code></a>. Until those land in
-          <code>torvalds/linux</code> master, <code>linux-firmware</code>
-          ships with the right files in the right places, and
-          <code>alsa-ucm-conf</code> ships the
-          <code>cs42l43-spk+cs35l56</code> codec dir, this repo is the
-          gap-filler. When all of that is upstream and your distro picks it
-          up, every module here becomes deletable.
+            <code>upstream-patches/</code></a>. Two of the audio pieces already
+          landed: <code>alsa-ucm-conf 1.2.16</code> ships the
+          <code>cs42l43-spk+cs35l56</code> codec dir and
+          <code>linux-firmware-cirrus &gt;= 20260519</code> ships the OEM blobs,
+          so on an up-to-date system <code>audio-fix</code> is already down to a
+          single SSP2-BT topology-noise drop-in. As the remaining kernel/quirk
+          patches land and your distro picks them up, every module here becomes
+          deletable.
         </p>
       </details>
 
