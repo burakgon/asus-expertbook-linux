@@ -2,14 +2,24 @@
 #
 # ASUS ExpertBook Ultra (B9406CAA) ships an Intel Wi-Fi 7 BE211 (PCI
 # 8086:e440 / subsystem 8086:0114) on Panther Lake CNVi, driven by the
-# new iwlmld op_mode. Out of the box on Linux 6.18+ / 7.x the link is
-# unstable on Wi-Fi 7 / 6 GHz / 320 MHz: kernel logs spam
-# "missed beacons exceeds threshold, but receiving data" and throughput
-# drops dramatically.
+# new iwlmld op_mode. On Linux 6.18 / 7.0 / 7.1-rc the Wi-Fi 7 / EHT
+# (802.11be) path on this card is broken: EHT RX collapses to MCS0/NSS1
+# and MLO sessions tear down, so the "Wi-Fi 7" link is in practice slower
+# and flakier than plain Wi-Fi 6. Not fixed upstream as of 7.1-rc7.
 #
-# This module bundles three independent fixes, each addressing one root
-# cause documented for Wi-Fi 7 BE2xx Intel cards on Linux. They are
-# additive — each one helps a different failure mode:
+# CORE FIX — disable EHT, fall back to Wi-Fi 6 (HE):
+#
+#   * iwlwifi disable_11be=Y.
+#     Turns off 802.11be entirely. The card renegotiates as 802.11ax
+#     (Wi-Fi 6 / HE), which is rock-solid at full speed (~2.1 Gbit/s at
+#     160 MHz, verified). This is the same workaround Omarchy ships as
+#     /etc/modprobe.d/iwlwifi-disable-eht.conf. Remove once Intel fixes
+#     the iwlwifi EHT path upstream.
+#
+# SECONDARY TUNABLES — stabilize the Wi-Fi 6 fallback further:
+# These don't keep Wi-Fi 7 alive; they just trim the remaining HE-mode
+# instability (occasional missed-beacon / Microcode-SW-error events) and
+# don't hurt. Each is independent and additive:
 #
 #   1) iwlmld power_scheme=1 (no driver-side power saving).
 #      Default is 2 (balanced) which dips into short power-saves under
@@ -29,15 +39,17 @@
 #      Core Ultra silicon and avoids the freeze.
 #
 # This module *does not* touch:
-#   - Wi-Fi band / channel width / protocol — Wi-Fi 7 stays Wi-Fi 7.
+#   - Wi-Fi band / channel width below EHT — 6 GHz and 160 MHz HE stay
+#     available; only the broken 802.11be/320 MHz EHT layer is dropped.
 #   - Bluetooth coexistence — bt_coex_active stays at default Y so BT
 #     audio / HID / file transfer all keep working.
 
 MODULE_NAME="wifi-fix"
-MODULE_DESC="ASUS ExpertBook Ultra (B9406CAA) Intel Wi-Fi 7 BE211 stability fixes"
-MODULE_VERSION="1.1.0"
+MODULE_DESC="ASUS ExpertBook Ultra (B9406CAA) Intel BE211: disable broken EHT, stabilize Wi-Fi 6 fallback"
+MODULE_VERSION="2.0.0"
 
 MODULE_FILES=(
+  "iwlwifi-disable-eht.conf:/etc/modprobe.d/iwlwifi-disable-eht.conf"
   "iwlmld-active.conf:/etc/modprobe.d/iwlmld-active.conf"
   "pcie-aspm-performance.conf:/etc/tmpfiles.d/pcie-aspm-performance.conf"
   "90-iwlwifi-no-offload:/etc/NetworkManager/dispatcher.d/90-iwlwifi-no-offload"
@@ -64,8 +76,9 @@ module_post_install() {
     done
   fi
 
-  echo "Reboot to fully apply iwlmld.power_scheme. ASPM and TSO/GSO have"
-  echo "been applied to the running session already."
+  echo "Reboot (or reload iwlwifi) to apply disable_11be=Y and"
+  echo "iwlmld.power_scheme. ASPM and TSO/GSO have been applied to the"
+  echo "running session already; the EHT-disable needs the driver reloaded."
 }
 
 module_post_uninstall() {
@@ -82,11 +95,25 @@ module_post_uninstall() {
       ethtool -K "$(basename "$ifc")" tso on gso on gro on >/dev/null 2>&1 || true
     done
   fi
-  echo "Reboot to revert iwlmld.power_scheme to the kernel default."
+  echo "Reboot to re-enable EHT (disable_11be) and revert"
+  echo "iwlmld.power_scheme to the kernel default."
 }
 
 module_status_extra() {
-  local cur="" iface link_summary aspm_policy off_state="?"
+  local cur="" iface link_summary aspm_policy off_state="?" eht=""
+
+  # Core fix: is 802.11be (EHT) disabled? This is the indicator that the
+  # actual BE211 bug is worked around. Y = EHT off -> stable Wi-Fi 6 fallback.
+  if [[ -r /sys/module/iwlwifi/parameters/disable_11be ]]; then
+    eht="$(cat /sys/module/iwlwifi/parameters/disable_11be 2>/dev/null || true)"
+    case "$eht" in
+      Y|y|1) printf '  EHT:      %sdisable_11be=Y (802.11be off — stable Wi-Fi 6/HE fallback)%s\n' "$c_ok" "$c_off" ;;
+      N|n|0) printf '  EHT:      %sdisable_11be=N (802.11be ON — BE211 EHT is broken, expect MCS0/MLO teardown)%s\n' "$c_warn" "$c_off" ;;
+      *)     printf '  EHT:      disable_11be=%s\n' "$eht" ;;
+    esac
+  else
+    printf '  EHT:      %siwlwifi not loaded (cannot read disable_11be)%s\n' "$c_dim" "$c_off"
+  fi
 
   if [[ -r /sys/module/iwlmld/parameters/power_scheme ]]; then
     cur="$(cat /sys/module/iwlmld/parameters/power_scheme 2>/dev/null || true)"

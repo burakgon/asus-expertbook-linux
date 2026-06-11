@@ -17,10 +17,18 @@
 #
 # We still drop the modprobe.d file as belt-and-suspenders for any future
 # scenario where xe is rmmod'd and re-loaded post-boot.
+#
+# Upstream status: there is NO dedicated upstream tracker for this PTL
+# PSR2 selective-fetch / DSB display hang. It is reproduced locally on
+# linux-cachyos 7.0.11 and linux-cachyos-rc 7.1-rc7. (drm/xe #7513 is a
+# related but DISTINCT Lunar Lake PMC-firmware shutdown bug — "rare
+# shutdown under load", label platform: LNL, leaves a BERT Hardware Error
+# and is NOT cured by disabling PSR — so it is NOT this bug.) The cmdline
+# workaround below is therefore still required on every current kernel.
 
 MODULE_NAME="display-fix"
 MODULE_DESC="ASUS ExpertBook Ultra (B9406CAA) xe driver Panel Replay PSR lockup workaround"
-MODULE_VERSION="1.1.1"
+MODULE_VERSION="1.1.2"
 
 MODULE_FILES=(
   "xe-disable-psr.conf:/etc/modprobe.d/xe-disable-psr.conf"

@@ -8,14 +8,27 @@
 #                                    so processed frames have a target
 #   obs-studio (extra)               the orchestrator + virtual cam writer
 #   obs-backgroundremoval (AUR)      ML segmentation plugin for OBS;
-#                                    runs ONNX models, can target NPU via
-#                                    OpenVINO if openvino is installed
+#                                    runs ONNX models. On Linux it runs
+#                                    CPU-ONLY: its inference providers are
+#                                    CUDA / ROCm / MIGraphX, with NO
+#                                    OpenVINO/NPU execution provider. So
+#                                    there is no NPU path through this
+#                                    plugin on Linux and no
+#                                    "Inference Device -> NPU" dropdown.
 #
 # What this module deliberately does NOT install:
-#   openvino (AUR)                   ~30+ minute compile from source. Add
-#                                    later with `paru -S openvino` if you
-#                                    want NPU acceleration. obs-bg-removal
-#                                    works fine on TFLite/CPU without it.
+#   openvino (AUR)                   ~30+ minute compile from source,
+#                                    AUR-ONLY (not in the official repos).
+#                                    Installing it does NOT enable NPU in
+#                                    obs-backgroundremoval (no OpenVINO EP
+#                                    on Linux). obs-bg-removal runs on CPU
+#                                    with or without it. OpenVINO is only
+#                                    useful here for the real NPU routes:
+#                                    a standalone OpenVINO script, or
+#                                    github.com/ericjchang/linux-studio-effects
+#                                    (OpenVINO + v4l2loopback; validated on
+#                                    Arrow Lake, NOT yet Panther Lake;
+#                                    git clone + pip + NPU driver, no pkg).
 #   intel/openvino-plugins-for-obs   no AUR packaging yet; build manually
 #                                    from intel/openvino-plugins-for-obs-studio
 #                                    if you want Intel's officially-blessed
@@ -24,11 +37,23 @@
 #
 # NPU device permissions: /dev/accel/accel0 ships world-writable on this
 # distro, so render-group membership is not required. We add the user
-# anyway as defensive future-proofing.
+# anyway as defensive future-proofing (this covers a standalone OpenVINO
+# script or linux-studio-effects, NOT the OBS plugin, which is CPU-only).
+#
+# v4l2loopback COEXISTENCE WARNING: this module installs a GLOBAL
+# `options v4l2loopback ... video_nr=10` line in /etc/modprobe.d/. If
+# another tool already uses v4l2loopback (e.g. linuxdrop on video_nr=20,
+# "LinuxDrop Camera"), the two collide: modprobe CONCATENATES options
+# lines and `devices=1` spawns only ONE node, so one tool's device never
+# appears. Prefer a single SHARED multi-device config, e.g.
+#   options v4l2loopback devices=2 video_nr=10,20 \
+#     card_label="AI Camera","LinuxDrop Camera" exclusive_caps=1,1
+# rather than shipping competing global options lines; or coordinate the
+# video_nr / devices count by hand. See README "v4l2loopback coexistence".
 
 MODULE_NAME="webcam-ai-fix"
 MODULE_DESC="AI camera stack — OBS + obs-backgroundremoval + v4l2loopback (NPU optional)"
-MODULE_VERSION="1.0.1"
+MODULE_VERSION="1.1.0"
 
 MODULE_FILES=(
   "v4l2loopback.conf:/etc/modules-load.d/v4l2loopback.conf"
@@ -80,10 +105,13 @@ module_post_install() {
   echo "  4) Tools → Start Virtual Camera (default writes to /dev/video10)."
   echo "  5) In Zoom / Discord / browser, pick 'AI Camera' as the camera."
   echo
-  echo "For NPU acceleration, install openvino:"
-  echo "  paru -S openvino"
-  echo "  ─ then in obs-backgroundremoval Filter settings, set"
-  echo "    'Inference Device' to NPU."
+  echo "NOTE: obs-backgroundremoval is CPU-ONLY on Linux (no OpenVINO/NPU"
+  echo "  execution provider, no 'Inference Device -> NPU' dropdown)."
+  echo "  Installing 'openvino' does NOT accelerate this OBS path."
+  echo "  For an actual NPU pipeline, use a purpose-built tool:"
+  echo "    github.com/ericjchang/linux-studio-effects  (OpenVINO + v4l2loopback)"
+  echo "    caveat: validated on Arrow Lake, not yet Panther Lake;"
+  echo "    installs via git clone + pip + NPU driver (no distro package)."
 }
 
 module_post_uninstall() {
@@ -138,19 +166,21 @@ module_status_extra() {
 
   # OpenVINO (optional)
   if pacman -Q openvino >/dev/null 2>&1; then
-    printf '  openvino:      %s%s — NPU acceleration enabled%s\n' "$c_ok" "$(pacman -Q openvino | awk '{print $2}')" "$c_off"
+    printf '  openvino:      %s%s — installed (NOT used by OBS plugin; CPU-only on Linux)%s\n' "$c_ok" "$(pacman -Q openvino | awk '{print $2}')" "$c_off"
 
-    # Quick test: does the OpenVINO runtime see the NPU?
+    # Quick test: does the OpenVINO runtime see the NPU? Informational only —
+    # relevant to a standalone OpenVINO script or linux-studio-effects, NOT
+    # obs-backgroundremoval (which has no OpenVINO/NPU execution provider).
     if command -v python3 >/dev/null 2>&1 && python3 -c 'import openvino' 2>/dev/null; then
       local devs
       devs=$(python3 -c "import openvino; print(','.join(openvino.Core().available_devices))" 2>/dev/null || true)
       if [[ "$devs" == *"NPU"* ]]; then
-        printf '  ov runtime:    %sdevices = %s%s\n' "$c_ok" "$devs" "$c_off"
+        printf '  ov runtime:    %sdevices = %s (usable by a standalone script, not OBS)%s\n' "$c_ok" "$devs" "$c_off"
       else
         printf '  ov runtime:    %sdevices = %s (no NPU yet — log out + in?)%s\n' "$c_warn" "$devs" "$c_off"
       fi
     fi
   else
-    printf '  openvino:      %snot installed (CPU only; install with: paru -S openvino)%s\n' "$c_dim" "$c_off"
+    printf '  openvino:      %snot installed (not needed; OBS plugin is CPU-only regardless)%s\n' "$c_dim" "$c_off"
   fi
 }

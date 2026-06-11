@@ -8,10 +8,12 @@
 #                           awareness, much better than the kernel's coarse
 #                           default on Panther Lake's hybrid topology.
 #
-#   intel-lpmd (AUR)        Intel Low Power Mode Daemon. When the system is
-#                           idle, parks all workload on a single LP-E core and
+#   intel-lpmd (extra/      Intel Low Power Mode Daemon. When the system is
+#   cachyos repo)           idle, parks all workload on a single LP-E core and
 #                           lets the P-cores deep-sleep — biggest single
-#                           idle-power win on PTL hardware.
+#                           idle-power win on PTL hardware. Stock config is
+#                           Mode 0 (Cgroup v2 cpuset): it confines tasks to the
+#                           LP-E cluster rather than offlining the P-cores.
 #
 # We deliberately DO NOT touch:
 #   - The Hyprland-only toggles (Omarchy is Hyprland-based; we run KDE Plasma
@@ -27,19 +29,9 @@
 
 MODULE_NAME="intel-perf-fix"
 MODULE_DESC="Panther Lake thermal + power daemons (thermald, intel-lpmd) à la Omarchy"
-MODULE_VERSION="1.0.0"
+MODULE_VERSION="1.1.0"
 
 MODULE_FILES=()
-
-# Locate an AUR helper. paru/yay refuse to run as root; we re-invoke them as
-# $SUDO_USER below.
-_perf_aur_helper() {
-  local h
-  for h in paru yay; do
-    command -v "$h" >/dev/null 2>&1 && { printf '%s' "$h"; return 0; }
-  done
-  return 1
-}
 
 module_post_install() {
   echo "  installing thermald (extra repo)"
@@ -49,46 +41,31 @@ module_post_install() {
   systemctl enable --now thermald.service 2>&1 | tail -1 || true
 
   echo
-  local helper
-  if helper="$(_perf_aur_helper)" && [[ -n "${SUDO_USER:-}" ]]; then
-    echo "  installing intel-lpmd from AUR via $helper (as $SUDO_USER)"
-    sudo -u "$SUDO_USER" "$helper" -S --needed --noconfirm intel-lpmd 2>&1 | tail -5 || true
+  echo "  installing intel-lpmd (extra/cachyos repo)"
+  pacman -S --needed --noconfirm intel-lpmd 2>&1 | tail -3 || true
 
-    if systemctl list-unit-files intel_lpmd.service >/dev/null 2>&1; then
-      echo "  enabling intel_lpmd.service"
-      systemctl enable --now intel_lpmd.service 2>&1 | tail -1 || true
-    elif systemctl list-unit-files lpmd.service >/dev/null 2>&1; then
-      echo "  enabling lpmd.service"
-      systemctl enable --now lpmd.service 2>&1 | tail -1 || true
-    else
-      echo "  warn: intel-lpmd installed but no systemd unit file found"
-    fi
-  else
-    echo "  skip AUR step: no helper found or SUDO_USER unset"
-    echo "  to finish manually: paru -S intel-lpmd && sudo systemctl enable --now intel_lpmd"
-  fi
+  echo "  enabling intel_lpmd.service"
+  systemctl enable --now intel_lpmd.service 2>&1 | tail -1 || true
 }
 
 module_post_uninstall() {
   echo "  disabling thermald.service"
   systemctl disable --now thermald.service 2>/dev/null || true
 
-  for svc in intel_lpmd.service lpmd.service; do
-    if systemctl list-unit-files "$svc" >/dev/null 2>&1; then
-      systemctl disable --now "$svc" 2>/dev/null && echo "  disabled $svc"
-    fi
-  done
+  if systemctl list-unit-files intel_lpmd.service >/dev/null 2>&1; then
+    systemctl disable --now intel_lpmd.service 2>/dev/null && echo "  disabled intel_lpmd.service"
+  fi
 
   echo
   echo "  Packages left installed (so revert is reversible without re-fetching)."
   echo "  Remove fully with:"
   echo "    sudo pacman -Rns thermald"
-  echo "    paru   -Rns intel-lpmd"
+  echo "    sudo pacman -Rns intel-lpmd"
 }
 
 module_status_extra() {
   local s
-  for svc in thermald.service intel_lpmd.service lpmd.service; do
+  for svc in thermald.service intel_lpmd.service; do
     s="$(systemctl is-active "$svc" 2>/dev/null || true)"
     case "$s" in
       active)        printf '  %-22s %sactive%s\n' "$svc" "$c_ok" "$c_off" ;;

@@ -9,4 +9,5 @@ MatchUdevType=touchpad
 MatchBus=i2c
 MatchVendor=0x093A
 MatchProduct=0x4F05
+MatchDMIModalias=dmi:*svnASUS*:pn*B9406*
 AttrEventCode=-ABS_MT_PRESSURE;-ABS_PRESSURE;

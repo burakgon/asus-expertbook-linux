@@ -15,8 +15,12 @@
 
 MODULE_NAME="touchpad-fix"
 MODULE_DESC="ASUS ExpertBook Ultra (B9406CAA) PixArt 093A:4F05 touchpad workaround"
-MODULE_VERSION="1.1.0"
+MODULE_VERSION="1.1.1"
 
+# The libinput quirk is the load-bearing fix; the hwdb clamp is optional
+# belt-and-suspenders (verified: quirk alone stops the Touch-jumps even with
+# pressure max still misreported). Both ship in the module anyway.
+#
 # NOTE: libinput 1.31 only honors '/etc/libinput/local-overrides.quirks' for
 # admin overrides — arbitrary *.quirks files in that directory are silently
 # ignored (only /usr/share/libinput/*.quirks gets globbed). So the source

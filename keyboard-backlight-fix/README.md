@@ -1,13 +1,21 @@
 # keyboard-backlight-fix
 
-Make the keyboard-backlight slider in KDE Plasma actually reach the
-embedded controller on the ASUS ExpertBook Ultra B9406CAA (BIOS
-`B9406CAA.304`).
+**Optional.** Restore *software* control of the keyboard backlight — the
+KDE Plasma brightness slider, `brightnessctl`, and direct `/sys` writes —
+on the ASUS ExpertBook Ultra B9406CAA (BIOS `B9406CAA.304`).
+
+> The keyboard backlight is **not** dead without this module. The **Fn
+> brightness hotkeys work out of the box** — they're handled by the
+> EC/BIOS in hardware and never touch the buggy ACPI path. If you only
+> use the Fn keys, you don't need this module. Install it only if you
+> want the OS (KDE slider / `brightnessctl` / sysfs) to set brightness.
 
 ## The bug
 
-The ASUS BIOS ships a broken `SLKB` ACPI method that handles keyboard
-backlight write requests. Disassembled from the live DSDT:
+Only **OS-initiated** brightness writes are broken; the Fn hotkeys are
+fine. The ASUS BIOS ships a broken `SLKB` ACPI method that handles the
+keyboard-backlight write requests the OS makes. Disassembled from the
+live DSDT:
 
 ```c
 Method (SLKB, 1, NotSerialized) {
@@ -22,9 +30,10 @@ Method (SLKB, 1, NotSerialized) {
 The mainline `asus-wmi` Linux driver writes the standard kernel range
 `0..3` to set keyboard brightness. That hits the third branch which
 **unconditionally clamps `Local0` to zero**. The EC dutifully applies
-"brightness = 0", and the keyboard backlight stays off forever no
-matter what KDE / `brightnessctl` / direct `/sys/class/leds/` writes
-do.
+"brightness = 0", so KDE / `brightnessctl` / direct `/sys/class/leds/`
+writes can't change the backlight — they all collapse to off. The Fn
+hotkeys are unaffected: they go through the EC directly, not `SLKB`, so
+the backlight still lights and dims from the keyboard itself.
 
 The OEM-tested `0x100..0x103` range works correctly — `Local0` ends up
 as `0..3` as intended. The intermediate `0x80..0x83` range works too
@@ -32,10 +41,12 @@ as `0..3` as intended. The intermediate `0x80..0x83` range works too
 
 ## The fix
 
-Userspace daemon **`asusd`** (shipped in `asusctl`) translates standard
-kernel-level brightness writes into the OEM range before invoking ACPI,
-side-stepping the buggy branch. Once `asusd` is running, KDE
-PowerDevil's keyboard-brightness control reaches the EC correctly.
+To get software control back, userspace daemon **`asusd`** (shipped in
+`asusctl`) translates standard kernel-level brightness writes into the
+OEM range before invoking ACPI, side-stepping the buggy branch. Once
+`asusd` is running, KDE PowerDevil's keyboard-brightness control reaches
+the EC correctly. (The Fn hotkeys already worked; this is purely about
+the OS-driven path.)
 
 Three pieces have to be in place after a reboot for this to keep
 working:
@@ -73,8 +84,14 @@ You should see:
   acpi_call-dkms pkg:    1.2.2-345.1
   acpi_call kmod:        loaded
   asusd:                 active (bus-activated by KDE/upower)
-  UPower KbdBacklight:   max=3 (KDE talks here)
+  sysfs write test:      OK — wrote 1, read back 1 (software control works)
+  UPower KbdBacklight:   max=3 (info only — present even when control is broken)
 ```
+
+The line that actually tells you the fix is working is **`sysfs write
+test: OK`** — it writes the LED brightness node and reads it back. With
+the bug unfixed it reports `FAILED — wrote 1, read back 0`. Note
+`UPower … max=3` shows up either way, so it is not a sign the fix took.
 
 ## Uninstall
 
@@ -103,6 +120,26 @@ paru -S acpi_call-dkms
 
 The status command picks it up automatically once installed.
 
+## Upstream tracking
+
+A kernel-side fix is on the way that would make `asusd` unnecessary for
+this. **`asus-armoury` (mainline Linux 6.19+)** is gaining
+keyboard-control firmware-attributes — Denis Benato's LKML series posted
+**2025-12-25** — which would expose the keyboard backlight directly under
+`/sys/class/firmware-attributes/asus-armoury/attributes/kbd_*`. Once a
+shipping kernel carries it, the OS can drive brightness through the
+correct ACPI range natively and this module's `asusd` workaround can be
+dropped (same way `display-fix` / `audio-fix` track their upstream).
+
+Not there yet: on the reference machine (kernel **7.0.11**)
+`asus-armoury` exposes only `charge_mode` and `pending_reboot` — no
+`kbd_*` attribute — so the daemon is still required today. Re-check after
+each kernel bump:
+
+```sh
+ls /sys/class/firmware-attributes/asus-armoury/attributes/ | grep -i kbd
+```
+
 ## Why not patch the BIOS / fix the ACPI table?
 
 Replacing the broken `SLKB` method requires either a custom SSDT shipped
@@ -111,5 +148,6 @@ fragile across kernel + BIOS upgrades) or a BIOS update from ASUS. Both
 are heavier than running `asusd`, which already handles the translation
 correctly and is shipped in distro repos for unrelated reasons.
 
-If a future ASUS BIOS revision fixes the `SLKB` branch, this entire
-module becomes redundant — uninstall.
+If a future ASUS BIOS revision fixes the `SLKB` branch — or a kernel
+ships the `asus-armoury` `kbd_*` attribute above — this entire module
+becomes redundant — uninstall.

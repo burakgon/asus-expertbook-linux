@@ -61,7 +61,7 @@ deletable.
 |---|---|
 | Is there a `sof_sdw` patch elsewhere in mainline that might already match us by SSID? | No. Searched master + drm-intel-next + linux-next. `0x15e4` / `B9406CAA` / `EXPERTBOOK` appear nowhere in upstream kernel. |
 | Is there a kernel-level "make Panel Replay work on Dell" patch we missed? | No. Confirmed by reading `drm-intel-next` `intel_quirks.c` — that branch is *adding more* per-device disable entries (Dell XPS 16 DA16260), not enabling Panel Replay. Phoronix coverage of the Linux 7.1 patch is explicit: "disabled by default, at least until the underlying issue can be sorted out". |
-| Is there a generic upstream Wi-Fi 7 BE211 fix Omarchy bundles that we should mirror? | None visible in `iwlwifi/cfg/{sc,bz,dr}.c`, `iwlwifi/pcie/drv.c`, or `iwl-config.h` in mainline. Whatever Omarchy patches for "Wi-Fi 7 on Dell XPS 2026+" appears to be either pre-mainline or in a Cachy/Dell-specific branch we couldn't locate. Our `wifi-fix` module's tunables (iwlmld power_scheme, ASPM, TSO/GSO) are donanım-bağımsız anyway. |
+| Is there a generic upstream Wi-Fi 7 BE211 fix Omarchy bundles that we should mirror? | Omarchy's fix is **not** a kernel patch — it's the same `options iwlwifi disable_11be=Y` modprobe drop-in this repo's `wifi-fix` now ships. EHT/802.11be is broken on BE211 and there is no upstream EHT fix in mainline `iwlwifi`/`iwlmld` as of 7.1-rc7, so disabling EHT (Wi-Fi 6 fallback) is the current best practice on both. |
 | Has `linux-firmware-cirrus` shipped our subsystem ID? | **Yes, in `20260410-1` (extra/core repo).** Older `1:20260309-1` (cachyos epoch) does not. The newer package contains: `cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin.zst` plus a `cs35l56-b0-dsp1-misc-104315e4.wmfw.zst` symlink → `cs35l56/CS35L56_Rev3.13.4.wmfw.zst`. The shipping content is byte-identical to the files audio-fix carries (verified via sha256). When CachyOS bumps their epoch to `1:20260410+`, the firmware blobs in `audio-fix/` become redundant and the module can shed them. |
 | Does the panel firmware bug have a fix in upstream xe? | Not for our model. The `intel_psr.c` codepath that times out (`Timed out waiting PSR idle state`) has had several touch-ups in 6.18-6.20 but none gates by panel sink OUI / DPCD revision in a way that helps us. The cleanest fix remains the per-device disable our 0001 adds. |
 
@@ -84,15 +84,15 @@ The libinput patch needs no rebuild — just place the new section into
 `touchpad-fix` (and `libinput quirks list /dev/input/event9` confirms
 it's loaded).
 
-The two kernel patches need a rebuild. The CachyOS kernel sources are
-already cloned at `~/Developer/kernel-build/linux-cachyos/`. The
+The two kernel patches need a rebuild. With the CachyOS kernel sources
+cloned (e.g. under `~/Developers/kernel-build/linux-cachyos/`), the
 PKGBUILD's `prepare()` already loops over every `*.patch` in `source=`
 and applies it, so adding our two patches to the source array is all
 that's needed.
 
 ```sh
-cd ~/Developer/kernel-build/linux-cachyos/linux-cachyos
-cp ~/Developer/asus_expertboot_linux/upstream-patches/000{1,2}*.patch .
+cd ~/Developers/kernel-build/linux-cachyos/linux-cachyos
+cp ~/Developers/asus-expertbook-linux/upstream-patches/000{1,2}*.patch .
 # Edit PKGBUILD: append the two filenames to the source=() array
 # Then:
 makepkg -si           # ~30-60 minutes; installs at the end

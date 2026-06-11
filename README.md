@@ -41,8 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/burakgon/asus-expertbook-linux/main
 
 If you're on a sibling model (`104315d4` / `104315f4`) and willing to test, see
 [Adding a new module / model](#adding-a-new-module-or-model). If you're on a
-different distro, the modules themselves still apply — only the AUR / paru
-parts of `intel-perf-fix` are Arch-specific.
+different distro, the modules themselves still apply — only the
+`pacman`-based package-install steps are Arch-specific.
 
 ## What this actually fixes — before / after
 
@@ -50,12 +50,11 @@ parts of `intel-perf-fix` are Arch-specific.
 |---|---|---|---|
 | **PixArt I²C-HID** haptic touchpad `093A:4F05` (ACPI `ASCP1D80`) | **Touchpad doesn't move the cursor.** Kernel log spams `kernel bug: Touch jump detected and discarded.` libinput rejects every event. | Cursor responds to light touches like any normal laptop. Zero "Touch jump" lines. | [`touchpad-fix`](touchpad-fix/) |
 | **Cirrus CS42L43** codec + 2× **CS35L56** speaker amps (PCI subsystem `1043:15e4`) | **Speakers are completely silent.** dmesg: `cs35l56: FIRMWARE_MISSING`, `Calibration disabled`. F1 mute LED stuck on. | Speakers play at any volume. dmesg: `Calibration applied`, `Tuning PID: 0x23134`. | [`audio-fix`](audio-fix/) |
-| **Intel Wi-Fi 7 BE211** Panther Lake CNVi (`8086:e440`) | **Wi-Fi 7 link unstable.** Kernel log spams `missed beacons exceeds threshold, but receiving data`. Throughput drops, occasional `Microcode SW error` 10 second freezes. | Stable Wi-Fi 7 / 6 GHz / 320 MHz link. Zero missed-beacon spam. No freezes under heavy load. | [`wifi-fix`](wifi-fix/) |
+| **Intel Wi-Fi 7 BE211** Panther Lake CNVi (`8086:e440`) | **Wi-Fi 7 (802.11be / EHT) is unstable.** EHT RX collapses to MCS0/NSS1, MLO sessions tear down, `missed beacons` spam, occasional `Microcode SW error` freezes. | EHT disabled (`disable_11be=Y`) → rock-solid **Wi-Fi 6 / HE** fallback (6 GHz, 160 MHz, ~2.1 Gbit/s verified). Zero beacon spam, no freezes. | [`wifi-fix`](wifi-fix/) |
 | **Samsung Display Corp** eDP panel + Intel **`xe`** driver (Xe3 Panther Lake iGPU) | **Internal panel goes black.** `kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver`. eDP-1 wedges, only reboot recovers. | Internal display stable indefinitely. PSR / Panel Replay disabled cleanly at boot. | [`display-fix`](display-fix/) |
 | **Intel Core Ultra X7/X9** Panther Lake hybrid (P + E + LP-E cores) | **Idle power 4–5 W**, fans audible at idle, P-cores never deep-sleep. | Idle ≈ 2–2.5 W. Workload parks on a single LP-E core. P-cores reach `C10`. | [`intel-perf-fix`](intel-perf-fix/) |
-| **Intel Panther Lake NPU** (`8086:b03e`) + USB UVC webcam | **No AI camera effects.** Windows Studio Effects (background blur, smart framing, voice focus) doesn't exist on Linux out of the box. | Same effects via OBS + `obs-backgroundremoval` plugin, exposed as a virtual camera ("AI Camera") that any chat app can use. NPU-acceleration available with `paru -S openvino`. | [`webcam-ai-fix`](webcam-ai-fix/) |
-| **ASUS BIOS `SLKB` ACPI method** (BIOS `B9406CAA.304`) | **Keyboard backlight slider in KDE does nothing.** `SLKB` clamps `Local0 = Zero` for the standard 0..3 brightness range that the kernel asus-wmi driver writes — so EC always gets brightness 0. Direct writes to `/sys/class/leds/asus::kbd_backlight/brightness` silently no-op. | KDE keyboard-brightness slider works. `asusd` userspace daemon translates kernel writes into the OEM-tested `0x100..0x103` range, which the BIOS handles correctly. | [`keyboard-backlight-fix`](keyboard-backlight-fix/) |
-| **Samsung Display ATNA40LE01-0** OLED panel (`xe` driver) | **HDR videos play in SDR.** `xe` reads 0 bytes from the eDP DDC channel; KDE marks the panel SDR-only (`HDR: incapable`, max 200 cd/m²). YouTube AV1-HDR tone-maps down, sRGB clipping on DCI-P3 content, 8-bit colour only. | KDE sees the real panel: `DCI-P3, BT.2020/SMPTE ST 2084 (HDR PQ)`, 700 / 1600 cd/m² peak, 12 bpc native. HDR toggle becomes available; YouTube HDR plays in true HDR with `bt2020` / `smpte2084` colour pipeline. | [`display-hdr-fix`](display-hdr-fix/) |
+| **USB UVC webcam** (+ idle Panther Lake NPU) | **No AI camera effects.** Windows Studio Effects (background blur, smart framing) doesn't exist on Linux out of the box. | **CPU** background blur via OBS + `obs-backgroundremoval`, exposed as a virtual camera ("AI Camera"). *(NPU offload is not available in the OBS plugin on Linux — see the module's reality-check note.)* | [`webcam-ai-fix`](webcam-ai-fix/) |
+| **ASUS BIOS `SLKB` ACPI method** (BIOS `B9406CAA.304`) | **KDE keyboard-backlight slider does nothing** — but the **Fn hotkeys still work** (the backlight is not dead). `SLKB` clamps OS-initiated `0..3` writes to `Local0 = Zero`, so KDE / `brightnessctl` / sysfs writes silently no-op. | *(optional)* KDE slider works: `asusd` translates kernel writes into the OEM-tested `0x100..0x103` range. | [`keyboard-backlight-fix`](keyboard-backlight-fix/) |
 
 > **Nothing this repo installs is a band-aid in the bad sense.** Every module
 > uses the exact same upstream-recognised mechanism (udev hwdb, libinput
@@ -79,7 +78,7 @@ After reboot:
 ./patch.sh status
 ```
 
-You should see all eight modules `up to date` and their runtime checks green.
+You should see all seven modules `up to date` and their runtime checks green.
 
 ### Or pick à la carte
 
@@ -102,13 +101,15 @@ typing single letters. Numbered table, color-coded state, cached.
 ```
 === asus_expertboot_linux patcher ===
 
-  #   Module             Version  Installed State          Description
-  -----------------------------------------------------------------------------
-  1   audio-fix          2.1.0    2.1.0     up to date     Speakers + mics + clean panel
-  2   display-fix        1.1.1    1.1.1     up to date     xe Panel Replay PSR lockup
-  3   intel-perf-fix     1.0.0    1.0.0     up to date     thermald + intel-lpmd
-  4   touchpad-fix       1.1.0    1.1.0     up to date     PixArt 093A:4F05 pressure quirk
-  5   wifi-fix           1.1.0    1.1.0     up to date     BE211 stability tweaks
+  #   Module                  Version  Installed State          Description
+  ----------------------------------------------------------------------------------
+  1   audio-fix               2.1.0    2.1.0     up to date     Speakers + mics + clean panel
+  2   display-fix             1.1.2    1.1.2     up to date     xe Panel Replay / PSR lockup
+  3   intel-perf-fix          1.1.0    1.1.0     up to date     thermald + intel-lpmd
+  4   keyboard-backlight-fix  1.1.0    1.1.0     up to date     (optional) KDE backlight slider
+  5   touchpad-fix            1.1.1    1.1.1     up to date     PixArt 093A:4F05 pressure quirk
+  6   webcam-ai-fix           1.1.0    1.1.0     up to date     OBS CPU background blur
+  7   wifi-fix                2.0.0    2.0.0     up to date     BE211: disable broken EHT
 
 Actions
   i <num>    install / update module (idempotent — re-runs post hooks)
@@ -208,36 +209,47 @@ automatically once the package crosses 1.2.16).
 
 </details>
 
-### 3. [`wifi-fix`](wifi-fix/) — BE211 stability without losing Wi-Fi 7
+### 3. [`wifi-fix`](wifi-fix/) — BE211: disable broken EHT, stabilize Wi-Fi 6
 
-<details><summary><b>The bug</b> — three independent failure modes</summary>
+<details><summary><b>The bug</b> — Wi-Fi 7 / EHT is broken on BE211</summary>
 
-1. **`iwlmld` defaults to `power_scheme=2`** (balanced power saving). Under
-   marginal SNR the radio enters short power-saves, misses beacons, and
-   trips the *"Stay connected, Expect bugs"* recovery path.
-2. **PCIe ASPM L1.x wake latency** on integrated CNVi cards is enough to
-   push some 802.11 timeouts past their threshold.
-3. **`iwlwifi`'s TX-segmentation offload bug** under heavy traffic produces
-   `Microcode SW error` and full 10-second system freezes.
+The core problem is **802.11be (EHT / Wi-Fi 7) itself** on the Intel BE211
+(`8086:e440`) under `iwlwifi`/`iwlmld`: the EHT RX path collapses to
+**MCS0 / NSS1** and MLO sessions tear down, so the "Wi-Fi 7" link is slower and
+flakier than plain Wi-Fi 6. Not fixed upstream as of Linux 7.1-rc7. Two
+secondary irritants pile on: `iwlmld` defaults to `power_scheme=2` (beacon-loss
+recovery churn), and the `iwlwifi` TX-segmentation offload bug can throw
+`Microcode SW error` under heavy traffic.
 
 ```
 $ sudo dmesg | grep -E "missed beacons|Microcode SW error" | wc -l
-2046                                    ← without the module
-0                                       ← with the module (over 4h of mixed use)
+2046                                    ← with EHT on
+0                                       ← with disable_11be=Y (Wi-Fi 6 fallback)
 ```
 
 </details>
 
-<details><summary><b>The fix</b> — three driver tunables, none of which downgrade the link</summary>
+<details><summary><b>The fix</b> — disable broken EHT, keep a stable Wi-Fi 6 link</summary>
+
+**Core fix** — drop the broken 802.11be layer so the radio runs as rock-solid
+Wi-Fi 6 (HE). Same approach Omarchy ships; verified at ~2.1 Gbit/s over 160 MHz
+6 GHz HE here:
+
+| File | Path | What it does |
+|---|---|---|
+| `iwlwifi-disable-eht.conf` | `/etc/modprobe.d/` | `options iwlwifi disable_11be=Y` — disables EHT / Wi-Fi 7; the link falls back to stable Wi-Fi 6 / HE. |
+
+**Secondary tunables** (trim remaining HE-mode instability; they do **not** keep
+Wi-Fi 7 alive):
 
 | File | Path | What it does |
 |---|---|---|
 | `iwlmld-active.conf` | `/etc/modprobe.d/` | `options iwlmld power_scheme=1` — disables driver-side power-save loop. |
-| `pcie-aspm-performance.conf` | `/etc/tmpfiles.d/` | At every boot, write `performance` to `/sys/module/pcie_aspm/parameters/policy` (CNVi has no per-device knob). |
-| `90-iwlwifi-no-offload` | `/etc/NetworkManager/dispatcher.d/` | On every `iwlwifi` interface up event, run `ethtool -K $iface tso off gso off gro off`. |
+| `pcie-aspm-performance.conf` | `/etc/tmpfiles.d/` | Write `performance` to `/sys/module/pcie_aspm/parameters/policy` at boot. |
+| `90-iwlwifi-no-offload` | `/etc/NetworkManager/dispatcher.d/` | `ethtool -K $iface tso off gso off gro off` on every `iwlwifi` up event. |
 
-**Untouched on purpose:** band, channel width, Wi-Fi 7 protocol features,
-`iwlwifi.bt_coex_active=Y` — Bluetooth keeps working.
+This is a deliberate **Wi-Fi 7 → Wi-Fi 6** downgrade — EHT is the problem on this
+silicon. `iwlwifi.bt_coex_active=Y` is left alone, so Bluetooth keeps working.
 
 </details>
 
@@ -281,10 +293,11 @@ This is **structurally identical to the per-device entry** the upstream
 proper `intel_dpcd_quirks[]` entry — once merged, this module becomes a
 no-op and can be uninstalled.
 
-The xe-side regression is tracked upstream as
-[drm/xe #7513](https://gitlab.freedesktop.org/drm/xe/kernel/-/issues/7513):
-still **open**, candidate patch unmerged as of Linux **7.1-rc7** — so the
-cmdline workaround is still required on every current kernel.
+There is **no dedicated upstream tracker** for this Panther Lake PSR2
+selective-fetch / DSB hang; it's reproduced locally on `linux-cachyos 7.0.11`
+and `linux-cachyos-rc 7.1-rc7`. (drm/xe #7513 — *"Lunar lake, rare shutdown
+under load"* — is a **distinct** Lunar Lake PMC-firmware bug, not this one.) No
+fix is merged on any current kernel, so the cmdline workaround is still required.
 
 </details>
 
@@ -297,7 +310,7 @@ eye-contact correction, and voice focus on the NPU. None of these are
 shipped on Linux out of the box, even though the Intel Panther Lake NPU
 itself is fully supported by the kernel (`intel_vpu` driver,
 `/dev/accel/accel0` exposed) and the userspace stack (OpenVINO 2026,
-level-zero) is available in the repos.
+level-zero) is available via the AUR.
 
 Without this module the NPU sits idle, the webcam feed has no AI
 processing, and there's no virtual-cam target for video chat apps to
@@ -313,8 +326,7 @@ read from.
 | `v4l2loopback-options.conf` | `/etc/modprobe.d/` | Persistent device config (`devices=1 video_nr=10 card_label='AI Camera' exclusive_caps=1`) |
 | `v4l2loopback-dkms` package | `extra` | Kernel module providing the virtual cam |
 | `obs-studio` package | `extra` | Capture + filter graph + virtual-cam writer |
-| `obs-backgroundremoval` package | AUR | ML segmentation OBS plugin (ONNX models, can target NPU via OpenVINO) |
-| `openvino` (optional) | AUR | Intel's official AI inference toolkit; enables NPU acceleration. ~30 min compile from source. |
+| `obs-backgroundremoval` package | AUR | ML segmentation OBS plugin (ONNX models). **CPU-only on Linux** — its execution providers are CUDA / ROCm / MIGraphX; there is no OpenVINO/NPU path in the OBS plugin. |
 
 The user is also added to the `render` group as defensive future-proofing
 for stricter NPU device permissions. `/dev/accel/accel0` ships
@@ -324,6 +336,16 @@ After install, the user opens OBS, adds a Video Capture Device source
 pointing at the real webcam, attaches the Background Removal filter,
 and starts the virtual camera. Any video chat app then sees the
 processed feed as "AI Camera".
+
+> **Reality check — no NPU offload in OBS on Linux.** `obs-backgroundremoval`
+> has no OpenVINO/NPU execution provider on Linux (installing `openvino` does
+> **not** add an "NPU" device); the filter runs on the **CPU** — fine for 720p30
+> background blur. For an actual NPU route see
+> [`ericjchang/linux-studio-effects`](https://github.com/ericjchang/linux-studio-effects)
+> (OpenVINO + v4l2loopback), but it's validated on Arrow Lake, **not yet Panther
+> Lake**, and installs via git + pip. Also: if another tool already uses
+> v4l2loopback (e.g. `linuxdrop` on `video_nr=20`), this module's global
+> `options` line collides — share one `devices=2 video_nr=10,20` config instead.
 
 </details>
 
@@ -346,7 +368,7 @@ all idle work concentrates on a single LP-E core and the P-cores deep-sleep.
 | Package | Source | Service | Effect |
 |---|---|---|---|
 | `thermald` | `extra` repo | `thermald.service` | P/E-core-aware thermal throttle. |
-| `intel-lpmd` | AUR (`paru -S intel-lpmd`) | `intel_lpmd.service` | Parks idle work on LP-E core, lets P-cores deep-sleep. |
+| `intel-lpmd` | `extra` / `cachyos` repo | `intel_lpmd.service` | Parks idle work on LP-E core, lets P-cores deep-sleep. |
 
 Both coexist with the existing `power-profiles-daemon` (PPD handles user
 profile, thermald handles thermal, intel-lpmd handles idle topology).
@@ -357,9 +379,13 @@ tracks file-based modules (versioned, idempotent, status-checked).
 
 </details>
 
-### 7. [`keyboard-backlight-fix`](keyboard-backlight-fix/) — work around the BIOS `SLKB` clamp bug
+### 7. [`keyboard-backlight-fix`](keyboard-backlight-fix/) — *(optional)* restore software/KDE backlight control
 
-<details><summary><b>The bug</b> — ASUS BIOS clamps every kernel-side brightness write to zero</summary>
+> **The backlight is not dead** — the **Fn hotkeys** toggle it fine (handled by
+> the EC in hardware, bypassing the buggy ACPI path). This module is **optional**:
+> it only restores *software* control (the KDE slider / `brightnessctl` / sysfs).
+
+<details><summary><b>The bug (software side)</b> — ASUS BIOS clamps OS-initiated brightness writes to zero</summary>
 
 The B9406CAA BIOS (`B9406CAA.304`) ships a broken `SLKB` ACPI method.
 Disassembled from the live DSDT:
@@ -403,79 +429,6 @@ the EC correctly.
 
 </details>
 
-### 8. [`display-hdr-fix`](display-hdr-fix/) — restore the panel's HDR / DCI-P3 capability
-
-<details><summary><b>The bug</b> — xe driver reads zero bytes from the panel; KDE thinks SDR-only</summary>
-
-The B9406CAA ships a Samsung Display **ATNA40LE01-0** OLED. The full
-EDID (extracted via `edid-decode`) describes a serious panel:
-
-| Spec | Value |
-|---|---|
-| Native | 2880×1800 @ 120 Hz |
-| Pixel | 12 bpc native, 10 bpc pipeline |
-| Gamut | DCI-P3 |
-| Min lum | 4 cd/m² |
-| Max lum | 700 cd/m² (full coverage), 1600 cd/m² (10% rect peak) |
-| EOTF | 2.20 (SDR) and BT.2020 / SMPTE ST 2084 (HDR PQ) |
-| Refresh | 30–120 Hz adaptive sync |
-
-DisplayHDR True Black 1000 class. KWin Wayland in Plasma 6.6+ already
-exposes `wp_color_manager_v1` with the full HDR pipeline (PQ ST2084
-transfer, set_luminances, named primaries up to BT.2020). But:
-
-```
-$ kscreen-doctor -o | grep -E 'HDR|Wide'
-    HDR: incapable
-    Wide Color Gamut: incapable
-
-$ stat -c%s /sys/class/drm/card0-eDP-1/edid
-0
-```
-
-The `xe` driver fails to read EDID over the eDP DDC/AUX channel — the
-sysfs blob is **0 bytes**. Without panel metadata, KDE marks the
-display SDR-only and refuses to enable HDR. Pipeline downgrades:
-
-- YouTube AV1-HDR videos in Vivaldi tone-map down to SDR (Rec.709)
-- 10-bit deep colour disabled, 8-bit RGB only
-- DCI-P3 wide gamut unused, sRGB clipping (reds/greens look washed)
-- Reference white pinned at 200 cd/m² instead of 700+
-
-</details>
-
-<details><summary><b>The fix</b> — inject the ASUS-supplied EDID via DRM firmware override</summary>
-
-ASUS thoughtfully stashes the panel's full EDID in an EFI variable
-named `AsusEDID-607005d5-3f75-4b2e-98f0-85ba66797a3e` (256 bytes after
-the standard 4-byte EFI attribute prefix) — including the DisplayID 2.0
-extension block with all the HDR specs above.
-
-| File / cmdline | Path | What it does |
-|---|---|---|
-| `asus-b9406-edid.bin` | `/usr/lib/firmware/edid/` | The 256-byte EDID payload extracted from EFI. SHA256-verified against the live EFI variable on every install — if a BIOS update changes the panel EDID, the install warns loudly. |
-| `drm.edid_firmware=eDP-1:edid/asus-b9406-edid.bin` | `/etc/default/limine` (regenerated by `limine-update`) | Tells DRM "for connector eDP-1, use this firmware blob instead of trying DDC." Same approach as `display-fix` — has to be on the kernel cmdline because xe loads from initramfs. |
-
-After install + reboot:
-
-```
-$ kscreen-doctor -o | grep -E 'HDR|Wide'
-    HDR: capable
-    Wide Color Gamut: capable
-```
-
-System Settings → Display → toggle **Enable HDR**. From there, KWin
-hands HDR-aware apps (Vivaldi, mpv-gpu-next) a real PQ-encoded HDR
-surface; SDR apps stay tone-mapped correctly via Allow EDR. YouTube
-HDR videos play with the full PQ curve, peak highlights at 700-1600
-cd/m² instead of clipped at 200.
-
-For Vivaldi specifically, also enable in `vivaldi://flags`:
-**Enable HDR Mode** + **Vulkan**. YouTube → "Stats for nerds" should
-then show `bt2020` / `smpte2084` for HDR videos.
-
-</details>
-
 ## How it works
 
 The whole project is a small bash module manager (`patch.sh`, ~500 lines)
@@ -490,7 +443,6 @@ asus-expertbook-linux/
 │   ├── README.md
 │   └── …                       # payload files
 ├── display-fix/  …
-├── display-hdr-fix/  …
 ├── intel-perf-fix/  …
 ├── keyboard-backlight-fix/  …
 ├── touchpad-fix/  …
@@ -600,9 +552,7 @@ subsystem `1043:15e4` (this exact laptop). Sibling subsystems
 upstream `linux-firmware`. The `touchpad-fix`, `wifi-fix`,
 `display-fix`, `intel-perf-fix`, `webcam-ai-fix`, and
 `keyboard-backlight-fix` modules are hardware-agnostic or match by
-family-level identifiers and apply more broadly. The `display-hdr-fix`
-EDID payload is **panel-specific** (Samsung Display ATNA40LE01-0); it
-will only help on B9406CAA SKUs that ship the same OLED.
+family-level identifiers and apply more broadly.
 
 PRs adding `module.sh` entries for sibling models are welcome.
 
@@ -617,10 +567,11 @@ Bluetooth audio, HID, and file transfer keep working as usual.
 
 <details><summary><b>Does this downgrade Wi-Fi 7?</b></summary>
 
-No. Wi-Fi 7 / 6 GHz / 320 MHz / EHT-MCS rates stay exactly as the card
-prefers. The wifi-fix only disables the driver-side power-save loop,
-the L1.x ASPM wake latency, and the buggy TX-segmentation offload —
-none of which limits link speed.
+**Yes — on purpose.** 802.11be / EHT is broken on the BE211 (RX collapses to
+MCS0/NSS1, MLO tears down), so `wifi-fix` disables it (`disable_11be=Y`) and the
+link runs as stable **Wi-Fi 6 / HE** instead — ~2.1 Gbit/s over 160 MHz 6 GHz
+here, faster in practice than the flaky EHT link. Drop the module (or set
+`disable_11be=N`) once Intel fixes the iwlwifi EHT path upstream.
 
 </details>
 

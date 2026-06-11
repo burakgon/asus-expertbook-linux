@@ -9,7 +9,7 @@ KDE Plasma + Arch / CachyOS.
 | Package | From | Service | What it does |
 |---|---|---|---|
 | `thermald` | `extra` repo | `thermald.service` | Intel thermal-management daemon. P/E-core-aware throttle that's significantly smarter than the kernel's default on Panther Lake's hybrid topology. |
-| `intel-lpmd` | AUR (via paru/yay) | `intel_lpmd.service` | Intel Low Power Mode Daemon. When the system is idle, parks all workload on a single LP-E core and lets the P-cores deep-sleep. Single biggest idle-power win on PTL — Omarchy reports 2 W idle on Framework 13, 2.2 W on XPS 16 OLED with this enabled. |
+| `intel-lpmd` | `extra` / `cachyos` repo | `intel_lpmd.service` | Intel Low Power Mode Daemon. When the system is idle, parks all workload on a single LP-E core and lets the P-cores deep-sleep. Single biggest idle-power win on PTL. Stock config is Mode 0 (Cgroup v2 cpuset). The ≈2–2.5 W idle figure is a target borrowed from reference designs (Framework 13, XPS 16 OLED), not measured on this B9406CAA. |
 
 Both daemons coexist with `power-profiles-daemon` (which we already had).
 `thermald` handles thermal throttle; PPD handles user power profile;
@@ -64,17 +64,18 @@ reversible without re-fetching from the network. To remove them fully:
 
 ```sh
 sudo pacman -Rns thermald
-paru   -Rns intel-lpmd
+sudo pacman -Rns intel-lpmd
 ```
 
-## Note: the AUR step
+## Note: the intel-lpmd package
 
-`intel-lpmd` lives only in the AUR. The module's install hook re-invokes
-`paru` (or `yay`, whichever is on `$PATH`) **as the original `$SUDO_USER`**,
-because both helpers refuse to run under root. If your environment has
-neither helper, install manually:
+`intel-lpmd` now ships as a normal binary package in both the `extra` and
+`cachyos` repos (it used to be AUR-only). The module's install hook pulls it
+with a plain `pacman -S --needed --noconfirm intel-lpmd` — same path as
+`thermald`, no AUR helper or `$SUDO_USER` dance. The package provides the
+`intel_lpmd.service` unit. To install manually:
 
 ```sh
-paru -S intel-lpmd
+sudo pacman -S --needed intel-lpmd
 sudo systemctl enable --now intel_lpmd.service
 ```

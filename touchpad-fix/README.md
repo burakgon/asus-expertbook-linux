@@ -9,8 +9,8 @@ detected and discarded`, so the cursor never moves.
 Confirmed reproducible on:
 
 - ASUS ExpertBook Ultra (B9406CAA, 2026, Panther Lake)
-- Kernels: `linux-cachyos 7.0.2`, `linux-cachyos-rc 7.1.rc1`
-- libinput 1.31.1, KDE Plasma on Wayland (CachyOS)
+- Kernel: `linux-cachyos 7.0.11`
+- libinput 1.31.3, KDE Plasma on Wayland (CachyOS)
 
 ## Files
 
@@ -19,7 +19,12 @@ Confirmed reproducible on:
 | `61-pixart-4f05-pressure-fix.hwdb` | `/etc/udev/hwdb.d/` | Clamps `ABS_PRESSURE` and `ABS_MT_PRESSURE` axes to 0:100 so libinput's pressure heuristics see sane values. |
 | `99-asus-expertbook-pixart-4f05.quirks` | `/etc/libinput/` | Tells libinput to ignore both pressure axes entirely (pattern borrowed from the shipped Asus UX302LA quirk). |
 
-Either file alone helps. Both together give the most reliable behaviour.
+The libinput quirk is the load-bearing fix and is sufficient on its own
+(verified on the reference machine: the hwdb clamp is **not** installed, the
+kernel still reports `ABS_MT_PRESSURE` max 2601, yet there are zero Touch-jumps
+and the cursor tracks fine). The hwdb is optional belt-and-suspenders — install
+it too if you want libinput's pressure heuristics to also see sane 0:100 values,
+but it is not required.
 
 ## Install
 
