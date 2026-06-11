@@ -250,6 +250,7 @@ DPCD register 0x300 and supports Panel Replay Selective Update (Early
 Transport). The `xe` driver's PSR idle wait times out on this panel firmware:
 
 ```
+xe 0000:00:02.0: [drm] Selective fetch area calculation failed in pipe A   # every boot
 xe 0000:00:02.0: [drm] *ERROR* Timed out waiting PSR idle state
 xe 0000:00:02.0: [drm] *ERROR* [CRTC:151:pipe A] DSB 0 timed out waiting for idle
 kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver
@@ -257,6 +258,13 @@ kwin_wayland: Pageflip timed out! This is a bug in the xe kernel driver
 
 Once the display engine wedges, only a reboot recovers it — modeset cycle,
 GPU GT0 reset, and runtime PSR-disable via debugfs all fail.
+
+It's worse than a black panel. When the PSR2 **selective-fetch** path deadlocks
+the DSB during heavy compositing (a screen capture is enough to trigger it), it
+can take the whole **kernel** down — a silent hard hang with no oops, no MCE,
+and an empty `pstore`/BERT. That software-DSB hang is distinct from the Lunar
+Lake PMC-firmware crash, which *does* leave a `BERT: [Hardware Error]` record
+and is **not** cured by disabling PSR.
 
 </details>
 
@@ -272,6 +280,11 @@ This is **structurally identical to the per-device entry** the upstream
 [`upstream-patches/0001`](upstream-patches/) ports the same approach to a
 proper `intel_dpcd_quirks[]` entry — once merged, this module becomes a
 no-op and can be uninstalled.
+
+The xe-side regression is tracked upstream as
+[drm/xe #7513](https://gitlab.freedesktop.org/drm/xe/kernel/-/issues/7513):
+still **open**, candidate patch unmerged as of Linux **7.1-rc7** — so the
+cmdline workaround is still required on every current kernel.
 
 </details>
 
@@ -516,8 +529,9 @@ operations know whether each module is `up to date`, `update available`,
   Wi-Fi 7 op-mode, the `xe` driver Panther Lake bringup, and the
   `cs35l56` driver. Anything older won't even probe most of this
   hardware.
-- **Tested on:** `linux-cachyos 7.0.x`, `linux-cachyos-rc 7.1-rc1`. Should
-  work on `linux-lts 6.18.x` and `linux 7.0.x` Arch builds.
+- **Tested on:** `linux-cachyos 7.0.x`, `linux-cachyos-rc` through `7.1-rc7`
+  (the `display-fix` PSR hang persists on all of them). Should work on
+  `linux-lts 6.18.x` and `linux 7.0.x` Arch builds.
 - **Distros:** Arch and Arch derivatives (CachyOS, EndeavourOS, Manjaro)
   all use the same `/etc/udev/hwdb.d`, `/etc/libinput`,
   `/etc/modprobe.d`, `/etc/wireplumber/wireplumber.conf.d` paths the
