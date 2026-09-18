@@ -1388,7 +1388,10 @@ static int sof_card_dai_links_create(struct snd_soc_card *card)
 		goto err_dai;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+#if defined(HAVE_ASOC_SDW_PARSE_DEV_CTX)
+	/* Linux 7.2.4+: takes (dev, ctx) in place of (card). */
+	ret = asoc_sdw_parse_sdw_endpoints(dev, ctx, sof_aux, sof_dais, sof_ends, &num_confs);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
 	ret = asoc_sdw_parse_sdw_endpoints(card, sof_aux, sof_dais, sof_ends, &num_confs);
 #else
 	ret = asoc_sdw_parse_sdw_endpoints(card, sof_dais, sof_ends, &num_confs);
