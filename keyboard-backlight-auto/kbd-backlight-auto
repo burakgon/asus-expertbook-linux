@@ -84,6 +84,7 @@ DEFAULTS = {
     "curve": DEFAULT_CURVE,
     "override_lut": DEFAULT_OVERRIDE_LUT,
     "lid_off": "yes",
+    "reassert": "5",
 }
 
 # linux/input-event-codes.h
@@ -452,6 +453,13 @@ class Controller:
         # path: hands off while it is Off, re-decide the moment it is On.
         self.panel = find_panel_dpms()
         self.panel_off = False
+        # Re-write the chosen level this often even when it has not changed.
+        # The LED cannot be read back, so a write by somebody else - a
+        # compositor's blank/restore, brightnessctl from a script - is
+        # invisible here and would otherwise stand until the next bucket
+        # change. 0 disables.
+        self.reassert = max(0.0, float(cfg["reassert"]))
+        self.last_write = None
 
     @staticmethod
     def _parse(parser, spec, fallback, what):
@@ -585,12 +593,18 @@ class Controller:
                 log("%.1f lux | %s | level %d/%d (unchanged)"
                     % (lux, why, level, self.backlight.max))
             return
+        now = time.monotonic()
+        differs = level != self.backlight.last
+        due = (self.reassert > 0 and
+               (self.last_write is None or now - self.last_write >= self.reassert))
         try:
-            changed = self.backlight.set(level)
+            written = self.backlight.set(level, force=due)
         except OSError as exc:
             log("cannot write %s: %s" % (self.backlight.path, exc))
             return
-        if changed or self.verbose:
+        if written:
+            self.last_write = now
+        if differs or self.verbose:
             log("%.1f lux | %s | level %d/%d" % (lux, why, level, self.backlight.max))
 
 
