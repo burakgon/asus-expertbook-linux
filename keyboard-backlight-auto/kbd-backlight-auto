@@ -381,6 +381,17 @@ def find_lid_device():
     return None
 
 
+def find_panel_dpms():
+    """The internal panel's DPMS node, if the DRM driver exposes one."""
+    for path in sorted(glob.glob("/sys/class/drm/card*-eDP-*/dpms")):
+        try:
+            read_text(path)
+            return path
+        except OSError:
+            continue
+    return None
+
+
 def read_proc_lid_state():
     """Lid state from /proc/acpi, used for the initial reading only.
 
@@ -432,6 +443,15 @@ class Controller:
         self.lid_closed = bool(read_proc_lid_state()) if self.lid_off else False
         self.lid_from_evdev = False
         self.last_time = None
+        # The internal panel's DPMS state. Omarchy blanks the keyboard together
+        # with the display when a locked screen goes dark, through brightnessctl,
+        # which is not an EC change and so never reaches brightness_hw_changed.
+        # On this EC brightnessctl's save/restore round-trips through a dead
+        # read-back, so "restore" at wake writes 0 and the keyboard stays dark.
+        # Watching the panel wake is the one signal that covers every such
+        # path: hands off while it is Off, re-decide the moment it is On.
+        self.panel = find_panel_dpms()
+        self.panel_off = False
 
     @staticmethod
     def _parse(parser, spec, fallback, what):
@@ -496,6 +516,18 @@ class Controller:
             % (level, self.backlight.max, self.override[0], self.override[1],
                lux))
 
+    def on_panel(self, off):
+        if off == self.panel_off:
+            return
+        self.panel_off = off
+        if off:
+            log("panel off | not touching")
+        else:
+            # Whatever the compositor restored, our last write is no longer
+            # what the LED shows; decide again from the curve.
+            self.backlight.forget()
+            log("panel on | re-applying the curve")
+
     def on_lid(self, closed):
         if closed == self.lid_closed:
             return
@@ -512,6 +544,15 @@ class Controller:
         lux = self.sample()
         if lux is None:
             return
+
+        if self.panel is not None:
+            try:
+                off = read_text(self.panel).lower() == "off"
+            except OSError:
+                off = False  # node gone (a DRM re-probe): behave as if lit
+            self.on_panel(off)
+            if self.panel_off:
+                return
 
         if self.lid_off and self.lid_closed:
             self.apply(0, lux, "lid closed")
