@@ -15,8 +15,15 @@ RestartSec=2
 
 # Needs: read /sys/bus/iio + /proc/acpi, read /dev/input/event*, write the LED.
 NoNewPrivileges=yes
-ProtectHome=yes
-ProtectSystem=strict
+# Not ProtectHome=: every mode of it also covers /run/user, where brightnessctl
+# keeps the per-session saved level that sync_saved corrects - "yes" hides it,
+# "read-only" and "tmpfs" leave it unwritable, and a BindPaths= on the same
+# path inherits the read-only flag (systemd's drop_duplicates propagates it).
+# This is what ProtectHome=tmpfs expands to, minus its /run/user entry.
+TemporaryFileSystem=/home:ro /root:ro
+# full, not strict: strict remounts the whole tree read-only, /run included.
+# full keeps /usr, /boot, /efi and /etc read-only and leaves /run writable.
+ProtectSystem=full
 PrivateTmp=yes
 ProtectControlGroups=yes
 ProtectKernelModules=yes
@@ -27,7 +34,10 @@ LockPersonality=yes
 MemoryDenyWriteExecute=yes
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
-CapabilityBoundingSet=
+# Root with no capabilities cannot enter /run/user/<uid> (mode 700), where
+# brightnessctl keeps the per-session saved level sync_saved corrects; the
+# file itself is world-writable, so traversal is the only right needed.
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
 IPAddressDeny=any
 PrivateNetwork=yes
 

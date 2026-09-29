@@ -94,6 +94,8 @@ module_post_install() {
 
   systemctl daemon-reload
   systemctl enable --now kbd-backlight-auto.service
+  # enable --now leaves an already-running daemon on the old code.
+  systemctl restart kbd-backlight-auto.service
 
   echo
   echo "Done. The keyboard backlight now follows the ambient light sensor."

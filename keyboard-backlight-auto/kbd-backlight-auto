@@ -84,6 +84,8 @@ DEFAULTS = {
     "curve": DEFAULT_CURVE,
     "override_lut": DEFAULT_OVERRIDE_LUT,
     "lid_off": "yes",
+    "reassert": "5",
+    "sync_saved": "yes",
 }
 
 # linux/input-event-codes.h
@@ -273,6 +275,43 @@ class Backlight:
         next curve decision only writes if it actually differs."""
         self.last = level
 
+    def sync_saved(self, level):
+        """Keep brightnessctl's saved level for this LED truthful.
+
+        `brightnessctl -s` saves what it reads back, and on this LED that is
+        always 0; `brightnessctl -r` then restores a dark keyboard. Desktops
+        use exactly that pair around a locked screen (Omarchy: keyboard off
+        with the display, restore on every wake of the unlock prompt), so
+        each restore turned the keys off behind our back. Writing the level
+        we chose into the file it restores from makes those restores
+        harmless. The file is per user session ($XDG_RUNTIME_DIR), created
+        world-writable by brightnessctl itself; absent, there is nothing to
+        correct. Returns True when a file was changed."""
+        name = os.path.basename(self.base)
+        changed = False
+        paths = glob.glob("/run/user/*/brightnessctl/leds/" + name)
+        if not paths:
+            self._sync_note("no brightnessctl save file for %s under /run/user "
+                            "(none yet, or the unit lacks CAP_DAC_READ_SEARCH)" % name)
+            return False
+        for path in paths:
+            try:
+                if read_text(path) == str(level):
+                    continue
+                with open(path, "w") as fh:
+                    fh.write(str(level))
+                changed = True
+            except OSError as exc:
+                self._sync_note("cannot correct %s: %s" % (path, exc))
+                continue
+        return changed
+
+    def _sync_note(self, msg):
+        """Log a sync_saved problem once, not once per tick."""
+        if getattr(self, "_sync_last_note", None) != msg:
+            self._sync_last_note = msg
+            log("sync_saved: " + msg)
+
 
 class AmbientSensor:
     """Ambient light sensor via the IIO sysfs interface.
@@ -381,6 +420,17 @@ def find_lid_device():
     return None
 
 
+def find_panel_dpms():
+    """The internal panel's DPMS node, if the DRM driver exposes one."""
+    for path in sorted(glob.glob("/sys/class/drm/card*-eDP-*/dpms")):
+        try:
+            read_text(path)
+            return path
+        except OSError:
+            continue
+    return None
+
+
 def read_proc_lid_state():
     """Lid state from /proc/acpi, used for the initial reading only.
 
@@ -432,6 +482,23 @@ class Controller:
         self.lid_closed = bool(read_proc_lid_state()) if self.lid_off else False
         self.lid_from_evdev = False
         self.last_time = None
+        # The internal panel's DPMS state. Omarchy blanks the keyboard together
+        # with the display when a locked screen goes dark, through brightnessctl,
+        # which is not an EC change and so never reaches brightness_hw_changed.
+        # On this EC brightnessctl's save/restore round-trips through a dead
+        # read-back, so "restore" at wake writes 0 and the keyboard stays dark.
+        # Watching the panel wake is the one signal that covers every such
+        # path: hands off while it is Off, re-decide the moment it is On.
+        self.panel = find_panel_dpms()
+        self.panel_off = False
+        # Re-write the chosen level this often even when it has not changed.
+        # The LED cannot be read back, so a write by somebody else - a
+        # compositor's blank/restore, brightnessctl from a script - is
+        # invisible here and would otherwise stand until the next bucket
+        # change. 0 disables.
+        self.reassert = max(0.0, float(cfg["reassert"]))
+        self.last_write = None
+        self.sync_saved = as_bool(cfg["sync_saved"])
 
     @staticmethod
     def _parse(parser, spec, fallback, what):
@@ -496,6 +563,27 @@ class Controller:
             % (level, self.backlight.max, self.override[0], self.override[1],
                lux))
 
+    def on_panel(self, off):
+        if off and self.panel_off:
+            # Still off: the blank's own save (0) may land after ours; keep
+            # the saved value at the level we chose until the panel is back.
+            if self.sync_saved and self.backlight.last is not None:
+                if self.backlight.sync_saved(self.backlight.last):
+                    log("panel off | corrected the saved level to %d" % self.backlight.last)
+            return
+        if off == self.panel_off:
+            return
+        self.panel_off = off
+        if off:
+            log("panel off | not touching")
+            if self.sync_saved and self.backlight.last is not None:
+                self.backlight.sync_saved(self.backlight.last)
+        else:
+            # Whatever the compositor restored, our last write is no longer
+            # what the LED shows; decide again from the curve.
+            self.backlight.forget()
+            log("panel on | re-applying the curve")
+
     def on_lid(self, closed):
         if closed == self.lid_closed:
             return
@@ -512,6 +600,15 @@ class Controller:
         lux = self.sample()
         if lux is None:
             return
+
+        if self.panel is not None:
+            try:
+                off = read_text(self.panel).lower() == "off"
+            except OSError:
+                off = False  # node gone (a DRM re-probe): behave as if lit
+            self.on_panel(off)
+            if self.panel_off:
+                return
 
         if self.lid_off and self.lid_closed:
             self.apply(0, lux, "lid closed")
@@ -544,12 +641,20 @@ class Controller:
                 log("%.1f lux | %s | level %d/%d (unchanged)"
                     % (lux, why, level, self.backlight.max))
             return
+        now = time.monotonic()
+        differs = level != self.backlight.last
+        due = (self.reassert > 0 and
+               (self.last_write is None or now - self.last_write >= self.reassert))
         try:
-            changed = self.backlight.set(level)
+            written = self.backlight.set(level, force=due)
         except OSError as exc:
             log("cannot write %s: %s" % (self.backlight.path, exc))
             return
-        if changed or self.verbose:
+        if written:
+            self.last_write = now
+            if self.sync_saved:
+                self.backlight.sync_saved(level)
+        if differs or self.verbose:
             log("%.1f lux | %s | level %d/%d" % (lux, why, level, self.backlight.max))
 
 

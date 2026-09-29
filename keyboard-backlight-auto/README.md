@@ -153,6 +153,24 @@ directly from sysfs rather than through iio-sensor-proxy's D-Bus API: the raw
 attribute stays readable even while the proxy holds the IIO buffer claimed,
 and it keeps the daemon free of any D-Bus dependency.
 
+### Lock screens that blank the keyboard
+
+A desktop that blanks the keyboard together with the display when a locked
+screen goes dark, and restores it on wake, does so with `brightnessctl -s set
+0` and `brightnessctl -r` (Omarchy does; the restore runs on every wake of
+the unlock prompt). On this LED `-s` saves the dead read-back — always `0` —
+so every restore turned the keyboard off behind the daemon's back, which
+cannot see a write it did not make. Three things cover it: the daemon watches
+the internal panel's DPMS node (`/sys/class/drm/card*-eDP-*/dpms`), stays
+hands-off while the panel is off and re-applies the curve the moment it is
+on; it re-writes its level every `reassert` seconds so any invisible write is
+undone; and `sync_saved` keeps brightnessctl's per-session save file
+(`$XDG_RUNTIME_DIR/brightnessctl/leds/<led>`) at the chosen level, so the
+restores restore the right thing. The unit hides `/home` and `/root` with
+`TemporaryFileSystem=` rather than `ProtectHome=`, because every mode of the
+latter also covers `/run/user`, and runs with `ProtectSystem=full` and
+`CAP_DAC_READ_SEARCH` so it can reach that file.
+
 ## Install
 
 ```sh
@@ -193,6 +211,8 @@ out, and the built-in defaults are the values documented above. Restart with
 | `curve` | Microsoft's | `<minlux>:<maxlux>:<percent>` triples |
 | `override_lut` | Microsoft's | `<minlux>:<maxlux>:<lower>:<upper>` 4-tuples |
 | `lid_off` | `yes` | Force the backlight off while the lid is shut |
+| `reassert` | `5` | Re-write the chosen level this often (seconds) even when unchanged, so a write by something else is undone; `0` disables |
+| `sync_saved` | `yes` | Keep brightnessctl's per-session saved level for this LED equal to the chosen level, so a desktop's `brightnessctl -r` restores the right value |
 
 Invalid values are rejected per Microsoft's own validation rules — a curve with
 gaps, no entries, or any bucket where `minlux ≥ maxlux` falls back to the
