@@ -28,12 +28,18 @@
 # lands on PSR1 too: Panther Lake has no PSR2 hardware tracking to fall back on
 # without selective fetch. `enable_psr=1` says it directly; status accepts both.
 #
-# modprobe.d alone is NOT enough on this distro: xe loads from the initramfs
-# before /etc/modprobe.d is honoured, so the params have to land on the kernel
-# cmdline. We install a managed `limine-entry-tool` drop-in and regenerate the
-# Limine entries. This is the CachyOS source of truth; `/etc/default/limine`
-# is not used by current limine-mkinitcpio-hook releases. GRUB users put the
-# same three parameters on GRUB_CMDLINE_LINUX_DEFAULT instead.
+# modprobe.d alone is NOT enough: xe loads from the initramfs before
+# /etc/modprobe.d is honoured, so the params have to land on the kernel
+# cmdline. Which file that means depends on the bootloader, so the parameters
+# go through lib/distro.sh's cmdline backend.
+#
+# On Limine that backend is bypassed: we keep installing the managed
+# `limine-entry-tool` drop-in verbatim, because it is the CachyOS source of
+# truth (`/etc/default/limine` is not used by current limine-mkinitcpio-hook
+# releases) and because it carries its own explanatory comment into
+# /etc/limine-entry-tool.d. cmdline_add's generic Limine branch would write a
+# bare KERNEL_CMDLINE line to a different drop-in instead. Everywhere else
+# (kernelstub on Pop!_OS, GRUB on Debian/Ubuntu) cmdline_add owns the change.
 #
 # We still drop the modprobe.d file as belt-and-suspenders for any future
 # scenario where xe is rmmod'd and re-loaded post-boot. Install also removes
@@ -47,12 +53,28 @@
 
 MODULE_NAME="display-fix"
 MODULE_DESC="B9406CAA xe: PSR1 self-refresh + working DPCD brightness"
-MODULE_VERSION="1.4.0"
+MODULE_VERSION="1.5.0"
+
+DISPLAY_FIX_DROPIN="/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf"
+
+# The three parameters the drop-in above carries, for the backends that take
+# them one token at a time. Keep in sync with limine-display.conf.
+DISPLAY_FIX_PARAMS=(
+  "xe.enable_dpcd_backlight=2"
+  "xe.enable_panel_replay=0"
+  "xe.enable_psr=1"
+)
 
 MODULE_FILES=(
   "xe-dpcd-backlight.conf:/etc/modprobe.d/xe-dpcd-backlight.conf"
-  "limine-display.conf:/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf"
 )
+
+# Installing the drop-in where nothing consumes it would leave a dead file that
+# uninstall still has to chase, and would make `status` list a payload that
+# does nothing. On Limine the array is exactly what it has always been.
+if [[ $(cmdline_backend) == limine ]]; then
+  MODULE_FILES+=("limine-display.conf:$DISPLAY_FIX_DROPIN")
+fi
 
 # True when a Limine drop-in, comments aside, sets xe.enable_psr or
 # xe.enable_panel_replay to anything but the PSR1 pair this module installs.
@@ -117,10 +139,30 @@ _df_regen_limine() {
   fi
 }
 
+# _df_apply <add|remove> -- put the three parameters on, or take them off, the
+# kernel cmdline. The Limine branch is the pre-existing code path, unchanged:
+# the drop-in is already in place (or already gone) by the time this runs, so
+# all that is left is regenerating the entries.
+_df_apply() {
+  local action="$1"
+  if [[ $(cmdline_backend) == limine ]]; then
+    _df_regen_limine
+    return 0
+  fi
+
+  if [[ $action == add ]]; then
+    cmdline_add "${DISPLAY_FIX_PARAMS[@]}" ||
+      die "[display-fix] kernel parameters were staged but the bootloader could not be updated"
+  else
+    cmdline_remove "${DISPLAY_FIX_PARAMS[@]}" ||
+      die "[display-fix] kernel parameters were removed but the bootloader could not be updated"
+  fi
+}
+
 module_post_install() {
   _df_remove_legacy_block
   _df_remove_obsolete_files
-  _df_regen_limine
+  _df_apply add
   echo
   echo "Reboot to apply: xe will run the panel in PSR1 with the VESA DPCD backlight forced."
 }
@@ -128,14 +170,24 @@ module_post_install() {
 module_post_uninstall() {
   _df_remove_legacy_block
   _df_remove_obsolete_files
-  _df_regen_limine
+  _df_apply remove
   echo
   echo "Reboot to return to the kernel's Panel Replay default and automatic backlight interface selection."
 }
 
+# _df_staged <param> -- the parameter is configured for the next boot.
+# On Limine that is the managed drop-in; elsewhere the bootloader's own config,
+# which cmdline_configured knows how to read.
+_df_staged() {
+  if [[ $(cmdline_backend) == limine ]]; then
+    grep -qs -- "$1" "$DISPLAY_FIX_DROPIN"
+  else
+    cmdline_configured "$1"
+  fi
+}
+
 module_status_extra() {
   local token backlight="" panel_replay="" psr="" sel_fetch=""
-  local staged=/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf
 
   while IFS= read -r token; do
     case $token in
@@ -163,8 +215,7 @@ module_status_extra() {
   elif [[ $sel_fetch == 0 ]]; then
     printf '  self-refresh:%s xe.enable_psr2_sel_fetch=0 without xe.enable_panel_replay=0: Panel Replay without selective update freezes the panel at boot%s\n' \
       "$c_warn" "$c_off"
-  elif grep -qs 'xe\.enable_panel_replay=0' "$staged" && \
-       grep -qs 'xe\.enable_psr=1' "$staged"; then
+  elif _df_staged "xe.enable_panel_replay=0" && _df_staged "xe.enable_psr=1"; then
     printf '  self-refresh:%s PSR1 staged, reboot to apply (this boot runs the Panel Replay default)%s\n' \
       "$c_warn" "$c_off"
   else
@@ -178,7 +229,7 @@ module_status_extra() {
   elif [[ -n $backlight ]]; then
     printf '  backlight:%s effective xe.enable_dpcd_backlight=%s (expected 2)%s\n' \
       "$c_warn" "$backlight" "$c_off"
-  elif [[ -f $staged ]]; then
+  elif _df_staged "xe.enable_dpcd_backlight=2"; then
     printf '  backlight:%s DPCD fix staged, reboot to apply%s\n' "$c_warn" "$c_off"
   else
     printf '  backlight:%s xe.enable_dpcd_backlight=2 is not active%s\n' "$c_warn" "$c_off"
