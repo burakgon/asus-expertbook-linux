@@ -189,6 +189,29 @@ if [[ -n $fingerprint ]]; then
       warn "install/update the normal libfprint + fprintd packages (need libfprint 1.94.100+)"
     fi
   fi
+  fp_dev="" fp_pwr="" fp_delay="" fp_runtime=""
+  for d in /sys/bus/usb/devices/*; do
+    if [[ -r "$d/idVendor" && -r "$d/idProduct" ]]; then
+      if [[ "$(<"$d/idVendor")" == "2808" && "$(<"$d/idProduct")" == "a97a" ]]; then
+        fp_dev="$d"
+        [[ -r "$d/power/control" ]] && fp_pwr="$(<"$d/power/control")"
+        [[ -r "$d/power/autosuspend_delay_ms" ]] && fp_delay="$(<"$d/power/autosuspend_delay_ms")"
+        [[ -r "$d/power/runtime_status" ]] && fp_runtime="$(<"$d/power/runtime_status")"
+        break
+      fi
+    fi
+  done
+  if [[ -z $fp_dev ]]; then
+    note "FocalTech sysfs node not found"
+  elif [[ $fp_pwr == on ]]; then
+    ok "USB autosuspend disabled (control=on, delay_ms=${fp_delay:-?}, runtime=${fp_runtime:-?})"
+  elif [[ $fp_delay == -* ]]; then
+    ok "control=$fp_pwr but delay_ms=$fp_delay disables autosuspend (runtime=${fp_runtime:-?})"
+  elif [[ $fp_runtime == suspended ]]; then
+    warn "reader is suspended (control=$fp_pwr, delay_ms=$fp_delay, runtime=$fp_runtime); a scan can hang until it resumes"
+  else
+    warn "autosuspend is allowed (control=${fp_pwr:-?}, delay_ms=${fp_delay:-?}, runtime=${fp_runtime:-?}); a scan can hang if the reader suspends"
+  fi
 else
   note "FocalTech 2808:a97a not detected"
 fi

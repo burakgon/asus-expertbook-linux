@@ -66,6 +66,7 @@ time via [`lib/distro.sh`](lib/distro.sh).
 | **Intel Sensor Hub** (`8086:e445`, carries the ambient light sensor) | **No ambient light sensor at all.** The kernel's generic `ish_ptl.bin` is rejected (`ISH loader: cmd 2 failed 10`); linux-firmware has no ASUS image, so `/sys/bus/iio` never gets an `als` device. | The ASUS-signed image from ASUS's own Sensor Hub driver package is verified and installed under the per-OEM name the kernel requests; `iio:device1 = als` appears and `keyboard-backlight-auto` has a sensor to read. | [`ish-firmware`](ish-firmware/) |
 | **Ambient light sensor** (`iio` `als`) + keyboard backlight | **The backlight never adapts to the room.** KDE PowerDevil reads the sensor for *screen* brightness only; the keyboard stays wherever the Fn keys left it, and comes up dark after every boot. | *(optional)* The backlight follows the room using Windows 11's documented ALR curve — dim in the dark, brightest around 40–100 lux, off above 200–300 lux. Forced off with the lid shut; Fn keys still take over. | [`keyboard-backlight-auto`](keyboard-backlight-auto/) |
 | **ASUS BIOS `SLKB` ACPI method** (BIOS `B9406CAA.312`) | **Keyboard brightness reads back as `0`** no matter what it was set to — sysfs, UPower and `brightnessctl` all report a dark keyboard, and `systemd-backlight` restores `0` at every boot. Writes themselves reach the EC fine. | *(superseded)* Nothing to fix on the write path: the v1.x `asusd` workaround targeted an ACPI branch mainline `asus-wmi` never reaches. Kept for older firmware, skips install by default. | [`keyboard-backlight-fix`](keyboard-backlight-fix/) |
+| **FocalTech FT9349 ESS** USB fingerprint reader (`2808:a97a`) | **Scans never register / enrollment hangs.** systemd's default fingerprint hwdb autosuspends the reader after 2s; while suspended, touching the power button emits no events. | Autosuspend disabled (`power/control=on`, `ID_AUTOSUSPEND=0`); sensor stays responsive. Enrolls and verifies via `fprintd` using the keyboard power button. | [`fingerprint-fix`](fingerprint-fix/) |
 
 > **Nothing this repo installs is a band-aid in the bad sense.** Every module
 > uses the exact same upstream-recognised mechanism (udev hwdb, libinput
@@ -1016,10 +1017,18 @@ PRs adding `module.sh` entries for sibling models are welcome.
 
 <details><summary><b>Does the fingerprint reader work?</b></summary>
 
-Yes. The FocalTech FT9349 (`2808:a97a`) is supported by upstream
-`libfprint 1.94.100` and later. Install the normal `libfprint` + `fprintd`
-packages, then enroll with `fprintd-enroll`. No out-of-tree patch is needed on
-current Arch/CachyOS.
+Yes, once USB autosuspend is disabled. The FocalTech FT9349 (`2808:a97a`) is supported by upstream `libfprint 1.94.100` and later, but systemd's default hwdb (`60-autosuspend-fingerprint-reader.hwdb`) enables USB autosuspend on it. With `power/control=auto` and a positive autosuspend delay, the chip enters `runtime_status=suspended` and drops touch events, so `fprintd-enroll`, `fprintd-verify`, and PAM auth wait until they time out. `control=auto` with a negative delay, such as `usbcore.autosuspend=-1`, does not suspend the reader.
+
+Install [`fingerprint-fix`](fingerprint-fix/) to disable autosuspend, then enroll using:
+
+```sh
+./patch.sh install fingerprint-fix
+fprintd-enroll -f right-index-finger "$USER"
+```
+
+The sensor is physically integrated into the **keyboard power button** (top-right key with the LED indicator). It is a press sensor (not a swipe sensor).
+
+> **Warning:** Do not toggle USB `authorized` or cycle driver unbinds to wake it up — that wedges the FT9349 controller firmware and can freeze kernel workers in `D`-state, requiring a full power-off shutdown to clear.
 
 </details>
 

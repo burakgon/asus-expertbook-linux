@@ -1,0 +1,4 @@
+# FocalTech FT9349 ESS (ASUS ExpertBook B9406CAA, USB 2808:a97a)
+# Overrides systemd's /usr/lib/udev/hwdb.d/60-autosuspend-fingerprint-reader.hwdb
+usb:v2808pA97A*
+ ID_AUTOSUSPEND=0

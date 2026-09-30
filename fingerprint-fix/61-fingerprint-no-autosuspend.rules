@@ -1,0 +1,4 @@
+# FocalTech FT9349 ESS (ASUS ExpertBook B9406CAA, USB 2808:a97a).
+# Keeps the reader out of USB autosuspend. Runs after 60-autosuspend.rules.
+# power/persist is left at the upstream default; it does not affect autosuspend.
+ACTION=="add|bind", SUBSYSTEM=="usb", ATTR{idVendor}=="2808", ATTR{idProduct}=="a97a", TEST=="power/control", ATTR{power/control}="on"
