@@ -44,6 +44,12 @@ sudo udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=28
 
 ## Enrolling Fingerprints
 
+Enrollment is a **terminal-only** operation; `fprintd-enroll` does not open a
+separate graphical enrollment window. If a setup command was launched by a
+desktop helper, notification, agent, or another terminal session, its prompt
+may not be visible in the user's active graphical session. Open the user's own
+terminal and run the enrollment command there.
+
 Make sure `fprintd` and `libfprint` are installed:
 
 ```sh
@@ -55,6 +61,19 @@ Enroll your right index finger (press repeatedly on the **power button** when pr
 ```sh
 fprintd-enroll -f right-index-finger "$USER"
 ```
+
+When prompted, repeatedly press and lift the finger on the **keyboard power
+button**. If the command produces no progress, first confirm that the fix is
+active:
+
+```sh
+./patch.sh status fingerprint-fix
+```
+
+The device should report `control=on` and `runtime=active`. A stuck reader may
+need a complete power-off and cold boot before enrollment can be retried; do
+not toggle USB `authorized` or unbind/rebind the device, as that can wedge the
+controller firmware.
 
 Verify enrollment:
 
