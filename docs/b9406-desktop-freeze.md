@@ -178,6 +178,53 @@ froze on stock 7.2 without it
 kernels carry it since 7.2.1. On Arch's or Omarchy's stock 7.2.y a freeze with
 no I2C flood and no PSR/DSB line can be this one; 7.3 or the 6.18 LTS avoids it.
 
+### Confirmed on B9406CAA (14 Oct 2026)
+
+Omarchy 4.0.4, stock `linux 7.2.3-arch1-3`, display-fix 1.4 already on the
+cmdline (`xe.enable_panel_replay=0 xe.enable_psr=1 xe.enable_dpcd_backlight=2`).
+After ~14.5 h uptime the desktop entered a repeating hitch: audio replayed the
+same buffer for ~5 s, the session advanced ~2 s, then hitch again, until a
+power-key reboot hung on `session-1.scope` timeout and needed a hard reset.
+
+Classify against the other two failures:
+
+| Check | Result |
+|---|---|
+| `timeout waiting for bus ready` | 0 |
+| `controller timed out` / ISHTP | 0 |
+| `PSR idle` / DSB / Pageflip | 0 |
+| `Allocated fbdev into stolen` | present at boot |
+| `not enough stolen space for compressed buffer` | present |
+| PipeWire near the end | `hw:sofsoundwire,0p: snd_pcm_avail after recover: Broken pipe` |
+| Mute-LED sync | `omarchy-audio-output-sink` timed out after 3 s (twice) |
+
+`linux-omarchy 7.2.5-3` was already installed. Its `xe.ko` no longer contains
+the `Allocated fbdev into stolen` strings; stock `7.2.3-arch1-3` still does.
+Limine was set to `default_entry: Omarchy/linux`, so every boot kept the
+vulnerable kernel even though `BOOT_ORDER` listed `linux-omarchy` first.
+
+Recovery on Omarchy:
+
+```sh
+# Prefer the kernel that already carries the stolen-FB backport
+sudo sed -i 's|^default_entry: Omarchy/linux$|default_entry: Omarchy/linux-omarchy|' /boot/limine.conf
+# Drop Limine's last-booted override if present
+efivar=LimineLastBootedEntry-513ee0d0-6e43-cb05-b272-f146a2fcb88a
+sudo chattr -i /sys/firmware/efi/efivars/$efivar 2>/dev/null
+sudo rm -f /sys/firmware/efi/efivars/$efivar
+```
+
+After reboot, confirm:
+
+```sh
+uname -r    # expect 7.2.5-3-omarchy (or newer linux-omarchy)
+journalctl -k -b --no-pager | grep -i stolen
+# expect NO "Allocated fbdev into stolen"
+```
+
+Alternatives when `linux-omarchy` is unavailable: Linux 7.3+, CachyOS 7.2.1+
+(carries `0687ec06f51b`), or the 6.18 LTS.
+
 ## Put the display parameters back
 
 `xe` loads from the initramfs, so `modprobe.d` alone does nothing on the next
@@ -237,6 +284,7 @@ after resume, with no package update in that minute.
 
 - Omarchy: [omacom/omarchy#13274](https://github.com/omacom/omarchy/issues/13274)
 - Display-fix 1.3 retirement: [asus-expertbook-linux#7](https://github.com/burakgon/asus-expertbook-linux/issues/7)
+- Stolen-memory freeze (stock 7.2): [CachyOS/linux-cachyos#986](https://github.com/CachyOS/linux-cachyos/issues/986), upstream [drm/xe#7513](https://gitlab.freedesktop.org/drm/xe/kernel/-/issues/7513)
 - PSR1 pinning: [asus-expertbook-linux#8](https://github.com/burakgon/asus-expertbook-linux/pull/8)
 - Omarchy drop-in restore and the first version of this document: [asus-expertbook-linux#22](https://github.com/burakgon/asus-expertbook-linux/pull/22)
 - Original Panel Replay stall, different bug (first frame never updates, fixed by `xe.enable_panel_replay=0` alone on an older kernel): [omacom/omarchy#5423](https://github.com/omacom/omarchy/issues/5423)
