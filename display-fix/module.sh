@@ -145,18 +145,27 @@ _df_regen_limine() {
 # all that is left is regenerating the entries.
 _df_apply() {
   local action="$1"
-  if [[ $(cmdline_backend) == limine ]]; then
-    _df_regen_limine
-    return 0
-  fi
-
-  if [[ $action == add ]]; then
-    cmdline_add "${DISPLAY_FIX_PARAMS[@]}" ||
-      die "[display-fix] kernel parameters were staged but the bootloader could not be updated"
-  else
-    cmdline_remove "${DISPLAY_FIX_PARAMS[@]}" ||
-      die "[display-fix] kernel parameters were removed but the bootloader could not be updated"
-  fi
+  case $(cmdline_backend) in
+    limine)
+      _df_regen_limine
+      ;;
+    none)
+      # Nothing was staged, so say what to do rather than report a failed
+      # bootloader update. Uninstall carries on: there is nothing to take off.
+      [[ $action == add ]] &&
+        die "[display-fix] no supported bootloader (Limine, kernelstub or GRUB); add to the kernel cmdline by hand: ${DISPLAY_FIX_PARAMS[*]}"
+      warn "[display-fix] no supported bootloader; if you added them by hand, remove: ${DISPLAY_FIX_PARAMS[*]}"
+      ;;
+    *)
+      if [[ $action == add ]]; then
+        cmdline_add "${DISPLAY_FIX_PARAMS[@]}" ||
+          die "[display-fix] kernel parameters were staged but the bootloader could not be updated"
+      else
+        cmdline_remove "${DISPLAY_FIX_PARAMS[@]}" ||
+          die "[display-fix] kernel parameters were removed but the bootloader could not be updated"
+      fi
+      ;;
+  esac
 }
 
 module_post_install() {

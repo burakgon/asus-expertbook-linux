@@ -409,9 +409,11 @@ cmdline_add() {
       fi
       ;;
     kernelstub)
+      # Callers test the result (`cmdline_add ... || die`), which turns off
+      # errexit in here, so a failed kernelstub has to be counted by hand.
       for param in "$@"; do
         cmdline_configured "$param" && continue
-        kernelstub -a "$param" >/dev/null
+        kernelstub -a "$param" >/dev/null || rc=1
         changed=1
       done
       ;;
@@ -460,7 +462,7 @@ cmdline_remove() {
     kernelstub)
       for param in "$@"; do
         cmdline_configured "$param" || continue
-        kernelstub -d "$param" >/dev/null
+        kernelstub -d "$param" >/dev/null || rc=1
         changed=1
       done
       ;;
