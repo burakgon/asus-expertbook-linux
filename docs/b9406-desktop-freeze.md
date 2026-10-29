@@ -153,7 +153,8 @@ where to look:
   active target cleanly"), and an Acer with an ELAN pad reports a similar
   7.1→7.2 regression that the LTS kernel does not show
   ([omarchy#11245](https://github.com/omacom/omarchy/issues/11245)). Run
-  6.18 LTS or 7.3-rc for a few days and compare.
+  7.3, or the 6.18 LTS (which has no speaker audio on this laptop), for a few
+  days and compare.
 - **Runtime PM.** Both `0000:00:19.0` and `i2c_designware.0` runtime-suspend
   after 1 s idle (`power/control=auto`). Pinning them on is a cheap test:
   `echo on | sudo tee /sys/bus/pci/devices/0000:00:19.0/power/control /sys/bus/platform/devices/i2c_designware.0/power/control`
@@ -176,7 +177,10 @@ new framebuffers"), is in 7.3 and not in 7.2.y stable. Two X7 358H machines
 froze on stock 7.2 without it
 ([CachyOS#986](https://github.com/CachyOS/linux-cachyos/issues/986)); CachyOS
 kernels carry it since 7.2.1. On Arch's or Omarchy's stock 7.2.y a freeze with
-no I2C flood and no PSR/DSB line can be this one; 7.3 or the 6.18 LTS avoids it.
+no I2C flood and no PSR/DSB line can be this one; 7.3 avoids it. The 6.18 LTS
+does too, but it has no speaker audio on this laptop (no machine driver match
+before 6.19). Having a fixed kernel installed is not enough: check `uname -r`,
+because the boot menu's default entry can still point at the stock one.
 
 ## Put the display parameters back
 
