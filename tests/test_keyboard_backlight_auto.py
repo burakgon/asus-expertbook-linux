@@ -175,7 +175,8 @@ class SensorDiscoveryTests(unittest.TestCase):
         second = self.sensor("iio:device2", 10)
         find.side_effect = [None, second]
         self.assertIsNone(controller.sample())
-        self.assertEqual(controller.sample(), 10.0)
+        # Smoothed against the first reading, so 10.000000000000002 can come back.
+        self.assertAlmostEqual(controller.sample(), 10.0)
         self.assertIs(controller.sensor, second)
 
     def test_present_sensor_is_not_rediscovered_every_tick(self):
