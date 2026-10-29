@@ -279,7 +279,11 @@ quirk carries no `Cc: stable`, so no 7.2.y or 6.18.y release has it yet and
 kernels whose `soc_sdw_utils` API gained the `dev, ctx` arguments through a
 stable backport (3.0.0 silently failed to rebuild there and audio fell back to
 *Dummy Output*); it probes the header instead of trusting the version, and no
-longer forces `LLVM=1` on GCC-built kernels.
+longer forces `LLVM=1` on GCC-built kernels. 3.3.0 (overlay 3.0.3) brings the
+card back on Linux 7.2.11, whose stable update took only half of the CS35L56
+OT25 series ([#28](https://github.com/burakgon/asus-expertbook-linux/issues/28)),
+and skips kernels before 6.19, such as the 6.18 LTS, with a warning instead of
+failing the install: they have no machine driver match for this laptop.
 
 | File | Path | What it does |
 |---|---|---|
@@ -288,7 +292,7 @@ longer forces `LLVM=1` on GCC-built kernels.
 | `cs35l56+cs42l43-spk.conf`, `cs42l43-spk+cs35l56.conf` | `/usr/share/alsa/ucm2/sof-soundwire/` | The Speaker device for the combined codec — routes playback to `hw:,2` and the CS35L56 + CS42L43 amps. |
 | `cs42l43-spk+cs35l56-init.conf` | `/usr/share/alsa/ucm2/codecs/cs42l43-spk+cs35l56/` | Combined codec init (control remap + LED attach). `module.sh` symlinks `cs35l56+cs42l43-spk` → this so both kernel names resolve. |
 | `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log on pre-7.1 kernels (inert on 7.1+, where the PCM no longer exists). Bluetooth audio (A2DP/HFP) still works via the PipeWire software path. |
-| `dkms/asus-expertbook-sof-sdw-3.0.2/` | `/usr/src/` + `/lib/modules/*/updates/dkms/` | Compatibility overlay for released kernels lacking upstream commit `90af3209742d`; not built where the in-kernel DMI quirk is detected, and DKMS never builds it for 7.3+. Upgrades compile the new overlay for every kernel first and take the old one off a kernel only once its replacement exists. |
+| `dkms/asus-expertbook-sof-sdw-3.0.3/` | `/usr/src/` + `/lib/modules/*/updates/dkms/` | Compatibility overlay for released 6.19–7.2 kernels lacking upstream commit `90af3209742d`; not built where the in-kernel DMI quirk is detected, and DKMS never builds it for 7.3+ or before 6.19. On 7.2.11 it also restores the CS35L56 feedback DAI that kernel lost. Upgrades compile the new overlay for every kernel first and take the old one off a kernel only once its replacement exists. |
 
 > The **F1 speaker-mute LED** needs `asus-wmi`'s `platform::mute` (WMI device
 > `0x0004001C`), which lands in Linux 7.4. On older kernels
@@ -467,7 +471,8 @@ three parameters to add by hand, and the modprobe.d half still applies.
   Thunderbolt/USB4 dock driving DisplayPort monitors; reproduced on a B9406CAA
   with a CalDigit TS5. Fixes are queued for 7.3 with `Cc: stable`
   ([CachyOS#1047](https://github.com/CachyOS/linux-cachyos/issues/1047)).
-  Unplug the dock before shutting down, or boot the 6.18 LTS kernel.
+  Unplug the dock before shutting down, or boot the 6.18 LTS kernel (which
+  has no speaker audio on this laptop).
 
 </details>
 
@@ -896,14 +901,14 @@ operations know whether each module is `up to date`, `update available`,
   Wi-Fi 7 op-mode, the `xe` driver Panther Lake bringup, and the
   `cs35l56` driver. Anything older won't even probe most of this
   hardware.
-- **Tested on:** the audio DKMS overlay compiles against
-  `linux-cachyos-lts 6.18.52`, `linux-cachyos 7.2.8`, and
-  `linux-cachyos-rc 7.3.0-rc4` (where the upstream quirk makes it unnecessary).
-  Matching kernel headers are required; the normal Arch/CachyOS DKMS hooks
-  rebuild it before boot images on upgrades. Compiling is not the same as a
-  working card on 6.18: that kernel lacks the default function-topology machine
-  fallback and the `ptl_cs42l43_agg_l3_cs35l56_l2` match that arrived in 6.19,
-  so speaker audio on 6.18 LTS is unverified.
+- **Tested on:** overlay 3.0.3 compiles against `linux-cachyos 7.2.9`, and
+  owners have run it on Arch and CachyOS 7.2.x; 7.3 has the upstream quirk and
+  needs no overlay. Matching kernel headers are required; the normal
+  Arch/CachyOS DKMS hooks rebuild it before boot images on upgrades. **The 6.18
+  LTS has no speaker audio on this laptop:** it lacks the default
+  function-topology machine fallback and the `ptl_cs42l43_agg_l3_cs35l56_l2`
+  match that arrived in 6.19, so no card comes up with or without the
+  overlay, and `audio-fix` skips it.
 - **Distros:** Arch and Arch derivatives (CachyOS, EndeavourOS, Manjaro)
   all use the same `/etc/udev/hwdb.d`, `/etc/libinput`,
   `/etc/modprobe.d`, `/etc/wireplumber/wireplumber.conf.d` paths the
@@ -921,7 +926,7 @@ operations know whether each module is `up to date`, `update available`,
   | `keyboard-backlight-auto` | works | config files plus a python3 daemon and its unit; no package manager involved |
   | `intel-perf-fix` | partial | `thermald` works (Ubuntu 24.04's `2.5.6-2ubuntu0.24.04.3` carries the Panther Lake backport). `intel-lpmd` is absent on Debian and, on Ubuntu 24.04, too old (0.0.3) to recognise Panther Lake — it installs and exits at once. Both cases are reported, not hidden |
   | `display-fix` | works | 1.5.0 writes the parameters through the cmdline backend. Tested on Pop!_OS 24.04 with kernelstub: PSR1 and the DPCD backlight active after a reboot, `intel_backlight` on the DPCD scale, brightness keys working. The GRUB path was exercised against a scratch config |
-  | `audio-fix` | not yet | Measured on Pop!_OS 24.04 against an earlier version. Fixed since: `dkms.conf` no longer forces `LLVM=1` (3.1.1), and overlay 3.0.2 is limited to 6.x–7.2 kernels and keeps going when one kernel fails to build. Still open: `audio_require_build_tools` installs `clang`, which GCC-built Debian kernels do not need; the bundled UCM files declare Syntax 7, which needs alsa-lib >= 1.2.12 (Ubuntu 24.04 ships 1.2.11), so installing them breaks UCM for the whole `sof-soundwire` family; the `NoExtract` pin maps to `dpkg-divert`; firmware ownership checks use `pacman -Qo` |
+  | `audio-fix` | not yet | Measured on Pop!_OS 24.04 against an earlier version. Fixed since: `dkms.conf` no longer forces `LLVM=1` (3.1.1), and overlay 3.0.3 is limited to 6.19–7.2 kernels and keeps going when one kernel fails to build. Still open: `audio_require_build_tools` installs `clang`, which GCC-built Debian kernels do not need; the bundled UCM files declare Syntax 7, which needs alsa-lib >= 1.2.12 (Ubuntu 24.04 ships 1.2.11), so installing them breaks UCM for the whole `sof-soundwire` family; the `NoExtract` pin maps to `dpkg-divert`; firmware ownership checks use `pacman -Qo` |
   | `camera-firmware` | not yet | needs `fwupd`, `jq`, `7z`, `curl` mapped to Debian names |
   | `ish-firmware` | untested | installs files only, but needs `7z` and `curl` and checks ownership with `pacman -Qo` |
   | `touchpad-haptics` | untested | files, a python3 CLI, a udev rule and a oneshot unit; no package manager involved |

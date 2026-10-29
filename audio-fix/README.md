@@ -67,7 +67,7 @@ overlay only where needed, and removes it once every kernel contains the quirk.
 | `cs35l56-…-l2u0.bin` / `.wmfw` | `/lib/firmware/cirrus/` | Per-OEM tuning + ROM `3.4.4`→`3.13.4` patch, left amp. **Only on `linux-firmware-cirrus < 20260519`** (see below). |
 | `cs35l56-…-l2u1.bin` / `.wmfw` | `/lib/firmware/cirrus/` | Same, right amp. |
 | `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log (pre-7.1 kernels; inert on 7.1+). A2DP/HFP Bluetooth still works via the PipeWire software path. |
-| `dkms/asus-expertbook-sof-sdw-3.0.2/` | `/usr/src/asus-expertbook-sof-sdw-3.0.2/` + `/lib/modules/*/updates/dkms/` | Board-scoped compatibility filter, built only for kernels lacking upstream commit `90af3209742d` (and never by DKMS for 7.3+); install also regenerates initramfs images. |
+| `dkms/asus-expertbook-sof-sdw-3.0.3/` | `/usr/src/asus-expertbook-sof-sdw-3.0.3/` + `/lib/modules/*/updates/dkms/` | Board-scoped compatibility filter, built only for 6.19–7.2 kernels lacking upstream commit `90af3209742d` (never by DKMS for 7.3+ or before 6.19); on 7.2.11 it also restores the CS35L56 feedback DAI. Install also regenerates initramfs images. |
 
 ### Installed only on `alsa-ucm-conf < 1.2.16` (otherwise the package provides them)
 
@@ -129,10 +129,20 @@ journalctl -k -b | grep -Ei 'sof|soundwire|cs35|cs42|snd'
 An empty card list together with `SDW3-Playback-SimpleJack`, `-EEXIST`, or
 `sof_sdw ... error -12` in the kernel log is the known phantom-RT722 failure.
 The duplicate SoundWire link aborts the `sof_sdw` probe before firmware, UCM,
-PipeWire, or WirePlumber can participate. Install `audio-fix` 3.2.0 and reboot
+PipeWire, or WirePlumber can participate. Install `audio-fix` 3.3.0 and reboot
 once. Its DKMS module is the packaged compatibility workaround;
 `./patch.sh status audio-fix` verifies the registration and selected module
 path for the running kernel.
+
+On **Linux 7.2.11** the card can also fail with `CODEC DAI cs35l56-ot25 not
+registered` even though the overlay is installed
+([#28](https://github.com/burakgon/asus-expertbook-linux/issues/28)). Stable
+7.2.11 took "ASoC: sdw_utils: Switch CS35L56/57/62/63 to use OT25 DAI" without
+its prerequisite "ASoC: cs35l56: Add DAI for SDCA OT25 stream", so the amps
+never register the DAI the feedback link names. Overlay 3.0.3 (`audio-fix`
+3.3.0) points that link back at `cs35l56-sdw1c`, as 7.2.10 did, on 7.2.11
+only; 7.2.12 has both halves. `./patch.sh status audio-fix` recognizes the
+message.
 
 If audio disappears right after a kernel update, check whether DKMS actually
 rebuilt the overlay: `dkms status asus-expertbook-sof-sdw` must say
@@ -144,7 +154,11 @@ overlay 3.0.0 on Linux 7.2.8, whose stable update backported the 7.3
 signature from the kernel headers. 3.0.2 adds a kernel range
 (`BUILD_EXCLUSIVE_KERNEL`, 6.x to 7.2): 3.0.1 let DKMS autoinstall build it for
 7.3+ kernels too, where it would replace the kernel's newer `sof_sdw` with this
-7.2-level copy although 7.3 has the quirk itself.
+7.2-level copy although 7.3 has the quirk itself. 3.0.3 narrows the range to
+6.19–7.2: the 6.18 LTS cannot build it since 6.18.55 backported the 7.3 API,
+and before 6.19 there is no card to fix anyway (see Known limitations).
+`audio-fix` 3.3.0 skips such kernels with a warning instead of failing the
+install.
 
 Upgrading the overlay compiles the new version for every kernel first. A
 kernel's older overlay is taken off (`dkms uninstall`, which keeps its build)
@@ -181,10 +195,17 @@ stock kernel driver restored.
 
 ## Known limitations
 
+- **No speakers before Linux 6.19, the 6.18 LTS included.** The machine
+  driver match for this laptop's codecs (`ptl_cs42l43_agg_l3_cs35l56_l2`) and
+  the default function-topology fallback arrived in 6.19; 6.18.55's
+  `snd-soc-acpi-intel-match` still lacks it, so no card comes up with or
+  without the overlay. Install skips those kernels with a warning, and
+  `./patch.sh status audio-fix` says so when one is running.
 - **F1 speaker-mute LED stays in its EC default state before Linux 7.4.**
   `asus-wmi` gains `platform::mute` (WMI device `0x0004001C`, audio-mute
   trigger) in 7.4. Until then only `platform::micmute` exists, driven by the
-  kernel's `audio-micmute` trigger.
+  kernel's `audio-micmute` trigger; [`mute-led-fix`](../mute-led-fix/) adds
+  the speaker LED on older kernels.
 - **The bundled cs35l56 blobs are a fallback only.** On
   `linux-firmware-cirrus >= 20260519` the package ships the `1043:15e4` tuning
   (per-amp `-l2uN.bin` plus the generic Rev 3.13.4 `.wmfw`), byte-identical to

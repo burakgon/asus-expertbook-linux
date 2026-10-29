@@ -40,6 +40,9 @@
 #      only that unattached RT722 on released kernels that need it. Upstream
 #      commit 90af3209742d adds the permanent DMI quirk; install detects that
 #      marker per kernel and skips/removes the redundant overlay automatically.
+#      The same overlay works around Linux 7.2.11's half-backported OT25
+#      series, which leaves no card at all. Kernels before 6.19 have no
+#      machine driver match for this laptop, so they are skipped with a note.
 #
 #   4) The generic SOF topology declares an unused SSP2-BT hardware-offload PCM
 #      with no firmware blob; WirePlumber's probe of it spams the kernel log
@@ -62,10 +65,10 @@
 
 MODULE_NAME="audio-fix"
 MODULE_DESC="B9406CAA audio: adaptive ghost-RT722 fix + HiFi UCM + cs35l56 firmware"
-MODULE_VERSION="3.2.0"
+MODULE_VERSION="3.3.0"
 
 AUDIO_DKMS_NAME="asus-expertbook-sof-sdw"
-AUDIO_DKMS_VERSION="3.0.2"
+AUDIO_DKMS_VERSION="3.0.3"
 AUDIO_DKMS_SOURCE="$MODULE_DIR/dkms/${AUDIO_DKMS_NAME}-${AUDIO_DKMS_VERSION}"
 AUDIO_DKMS_SRCDIR="/usr/src"
 AUDIO_DKMS_TARGET="$AUDIO_DKMS_SRCDIR/${AUDIO_DKMS_NAME}-${AUDIO_DKMS_VERSION}"
@@ -249,6 +252,16 @@ audio_kernel_has_upstream_ghost_quirk() {
   [[ -n $marker ]]
 }
 
+# audio_kernel_predates_card [kernel-release]
+#
+# Before Linux 6.19 no machine driver matches this laptop's codecs
+# (ptl_cs42l43_agg_l3_cs35l56_l2), so no card comes up there with or without
+# the overlay. Matches the overlay's BUILD_EXCLUSIVE_KERNEL lower bound.
+audio_kernel_predates_card() {
+  local kernel="${1:-$(uname -r)}"
+  [[ $kernel =~ ^([0-5]\.|6\.([0-9]|1[0-8])\.) ]]
+}
+
 audio_dkms_installed_for_kernel() {
   local kernel="${1:-$(uname -r)}" status=""
   command -v dkms >/dev/null 2>&1 || return 1
@@ -273,7 +286,7 @@ module_install_state() {
       echo update-available
       return
     fi
-  elif ! audio_dkms_installed_for_kernel; then
+  elif ! audio_kernel_predates_card && ! audio_dkms_installed_for_kernel; then
     echo partial
     return
   fi
@@ -289,13 +302,15 @@ module_install_state() {
 
 # DKMS modules this repository installed before, oldest first. Exact names,
 # never a wildcard: the two experimental modules it superseded, overlay 3.0.0
-# (cannot build on Linux 7.2.8+) and 3.0.1 (no kernel range, so DKMS also
-# built it for 7.3+, whose own sof_sdw is newer and has the quirk).
+# (cannot build on Linux 7.2.8+), 3.0.1 (no kernel range, so DKMS also built
+# it for 7.3+, whose own sof_sdw is newer and has the quirk) and 3.0.2 (no
+# card on 7.2.11, and DKMS still tried the 6.18 LTS).
 AUDIO_DKMS_LEGACY=(
   "sof-sdw-simplejack-fix/0.1"
   "soundwire-intel-b9406-ghostfix/0.1"
   "asus-expertbook-sof-sdw/3.0.0"
   "asus-expertbook-sof-sdw/3.0.1"
+  "asus-expertbook-sof-sdw/3.0.2"
 )
 
 # State of DKMS module $1 (name/version) on kernel $2: "installed", "built"
@@ -395,6 +410,11 @@ audio_require_build_tools() {
     pkg_install "${missing[@]}" || die "[audio-fix] missing build tools: ${missing[*]}"
   fi
 
+  # Headers for the running kernel only when it gets the overlay; every other
+  # kernel's headers are checked where it is built.
+  if audio_kernel_has_upstream_ghost_quirk || audio_kernel_predates_card; then
+    return 0
+  fi
   kernel_headers_present || \
     kernel_headers_install || \
     die "[audio-fix] kernel headers missing for $(uname -r)"
@@ -413,7 +433,7 @@ audio_install_dkms() {
   # Before anything can install packages: a new headers package runs the DKMS
   # pacman hook, which reads every source under /usr/src as root.
   audio_secure_legacy_sources
-  if ! audio_kernel_has_upstream_ghost_quirk; then
+  if ! audio_kernel_has_upstream_ghost_quirk && ! audio_kernel_predates_card; then
     audio_require_build_tools
   fi
 
@@ -435,6 +455,11 @@ audio_install_dkms() {
   (( keep )) || rm -rf -- "$AUDIO_DKMS_TARGET"
 
   while IFS= read -r kernel; do
+    # Not a failure to report: no overlay can give that kernel a card.
+    if audio_kernel_predates_card "$kernel"; then
+      warn "[audio-fix] skipping $kernel: before Linux 6.19 no machine driver matches this laptop's codecs, so it has no speakers with or without the overlay"
+      continue
+    fi
     if audio_kernel_has_upstream_ghost_quirk "$kernel"; then
       log "[audio-fix] $kernel contains upstream B9406CAA ghost-RT722 quirk; DKMS not needed"
       # Retire a build an earlier run or DKMS autoinstall left for it.
@@ -471,7 +496,7 @@ audio_install_dkms() {
     if audio_remove_legacy_dkms; then
       changed=1
     fi
-    log "[audio-fix] every installed kernel contains the upstream DMI quirk; no DKMS overlay needed"
+    log "[audio-fix] no installed kernel needs the DKMS overlay (the upstream DMI quirk, or Linux before 6.19)"
     if (( changed )); then
       audio_refresh_initramfs "with the stock upstream SoundWire quirk"
     fi
@@ -683,7 +708,10 @@ module_status_extra() {
   dkms_state="$(dkms status -m "$AUDIO_DKMS_NAME" -v "$AUDIO_DKMS_VERSION" \
     -k "$(uname -r)" 2>/dev/null || true)"
   module_path="$(modinfo -n snd-soc-sof-sdw 2>/dev/null || true)"
-  if audio_kernel_has_upstream_ghost_quirk; then
+  if audio_kernel_predates_card; then
+    printf '  kernel:   %sLinux %s predates 6.19: no machine driver matches this laptop'\''s codecs, so there are no speakers on this kernel; boot 7.2 or newer%s\n' \
+      "$c_warn" "$(uname -r)" "$c_off"
+  elif audio_kernel_has_upstream_ghost_quirk; then
     if [[ $module_path == */updates/dkms/* ]]; then
       printf '  kernel:   %supstream B9406CAA quirk present; redundant DKMS is still selected — update audio-fix and reboot%s\n' \
         "$c_warn" "$c_off"
@@ -735,7 +763,15 @@ module_status_extra() {
   if [[ -z $cards || $cards == *"no soundcards"* ]]; then
     printf '  card:     %sno ALSA sound card registered (PipeWire will show Dummy Output)%s\n' \
       "$c_warn" "$c_off"
-    if grep -Eq 'SDW3-Playback-SimpleJack|sof_sdw.*(error -12|failed with error -12)' <<<"$kmsg"; then
+    if grep -qF 'CODEC DAI cs35l56-ot25 not registered' <<<"$kmsg"; then
+      if [[ $dkms_state == *installed* ]]; then
+        printf '  kernel:   %sLinux 7.2.11 OT25 regression from the current boot; reboot once to load overlay %s, which works around it%s\n' \
+          "$c_warn" "$AUDIO_DKMS_VERSION" "$c_off"
+      else
+        printf '  kernel:   %sLinux 7.2.11 regression: the amps never register cs35l56-ot25; update audio-fix (overlay %s works around it) or move to 7.2.12 or later%s\n' \
+          "$c_warn" "$AUDIO_DKMS_VERSION" "$c_off"
+      fi
+    elif grep -Eq 'SDW3-Playback-SimpleJack|sof_sdw.*(error -12|failed with error -12)' <<<"$kmsg"; then
       if [[ $dkms_state == *installed* ]]; then
         printf '  kernel:   %sghost RT722 failure is from the current boot; reboot once to load the installed DKMS fix%s\n' \
           "$c_warn" "$c_off"

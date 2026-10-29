@@ -975,6 +975,41 @@ static int b9406caa_prune_ghost_rt722(struct device *dev,
 	return sdw_be_num - old_dai_num + new_dai_num;
 }
 
+/*
+ * Linux 7.2.11 took "ASoC: sdw_utils: Switch CS35L56/57/62/63 to use OT25
+ * DAI" (upstream 4b7f393a01f8) without its prerequisite "ASoC: cs35l56: Add
+ * DAI for SDCA OT25 stream" (86c8360c97f6). The amps never register the
+ * cs35l56-ot25 DAI that the feedback link now names, so the card fails to
+ * bind with "CODEC DAI cs35l56-ot25 not registered". Point the link back at
+ * cs35l56-sdw1c, as in 7.2.10: the codec registers that DAI with or without
+ * the OT25 patch. 7.2.12 carries the codec half.
+ */
+static void b9406caa_fix_7_2_11_ot25(struct device *dev,
+				     struct asoc_sdw_mc_private *ctx)
+{
+#if LINUX_VERSION_CODE == KERNEL_VERSION(7, 2, 11)
+	struct asoc_sdw_dai_info *dai;
+	int fixed = 0;
+	int i, j;
+
+	if (!dmi_check_system(b9406caa_dmi_table))
+		return;
+
+	for (i = 0; i < ctx->codec_info_list_count; i++) {
+		for (j = 0; j < codec_info_list[i].dai_num; j++) {
+			dai = &codec_info_list[i].dais[j];
+			if (dai->dai_name && !strcmp(dai->dai_name, "cs35l56-ot25")) {
+				dai->dai_name = "cs35l56-sdw1c";
+				fixed++;
+			}
+		}
+	}
+
+	if (fixed)
+		dev_info(dev, "B9406CAA: Linux 7.2.11 lacks the cs35l56-ot25 DAI, using cs35l56-sdw1c\n");
+#endif
+}
+
 static int create_sdw_dailink(struct snd_soc_card *card,
 			      struct asoc_sdw_dailink *sof_dai,
 			      struct snd_soc_dai_link **dai_links,
@@ -1603,6 +1638,8 @@ static int mc_probe(struct platform_device *pdev)
 	/* reset amp_num to ensure amp_num++ starts from 0 in each probe */
 	for (i = 0; i < ctx->codec_info_list_count; i++)
 		codec_info_list[i].amp_num = 0;
+
+	b9406caa_fix_7_2_11_ot25(card->dev, ctx);
 
 	ret = sof_card_dai_links_create(card);
 	if (ret < 0)
