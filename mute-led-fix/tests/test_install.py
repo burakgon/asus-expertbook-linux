@@ -147,6 +147,25 @@ module_install
         self.assertEqual(result.returncode, 42, result.stderr)
         self.assertNotIn("publish-config", result.stdout)
 
+    def test_running_7_4_keeps_the_bridge_for_older_installed_kernels(self):
+        result = self.install(kernel="7.4.1-arch1-1", others=("7.3.0-2-cachyos-bore-lto",),
+                              registered="0.2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("dkms-remove-0.2", result.stdout)
+        self.assertIn("dkms-install-0.2-7.3.0-2-cachyos-bore-lto", result.stdout)
+        self.assertNotIn("dkms-install-0.2-7.4.1-arch1-1", result.stdout)
+        self.assertNotIn("load-driver", result.stdout)
+        self.assertIn("publish-config", result.stdout)
+        self.assertNotIn("provided by the kernel", result.load_text)
+
+    def test_native_led_on_the_running_kernel_still_bridges_older_kernels(self):
+        result = self.install(native=True, others=("7.2.11-arch1-1",))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dkms-install-0.2-7.2.11-arch1-1", result.stdout)
+        self.assertNotIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertNotIn("load-driver", result.stdout)
+        self.assertNotIn("provided by the kernel", result.load_text)
+
 
 def subprocess_run(script, manifest, environment, root):
     import subprocess

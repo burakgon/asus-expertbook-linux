@@ -32,6 +32,19 @@ mute_native_speaker_led() {
   [[ -e /sys/class/leds/platform::mute && ! -d /sys/module/b9406_mute_led ]]
 }
 
+# Installed kernels that still need the bridge. The running kernel drops out
+# when it already shows a native platform::mute; older kernels installed next
+# to a 7.4+ one stay in, so booting them keeps F1.
+mute_bridge_kernels() {
+  local k running
+  running=$(uname -r)
+  while IFS= read -r k; do
+    mute_kernel_needs_bridge "$k" || continue
+    [[ $k == "$running" ]] && mute_native_speaker_led && continue
+    printf '%s\n' "$k"
+  done < <(kernel_list)
+}
+
 mute_install_source() {
   local bundle="$MODULE_DIR/dkms/b9406-mute-led-$MUTE_DKMS_VERSION"
   [[ -f $bundle/dkms.conf ]] || die "[mute-led-fix] missing $bundle"
@@ -57,12 +70,14 @@ mute_remove_version() {
 # Rebuilding it in place would replace a module root already compiled.
 mute_ensure_dkms() {
   local bundle="$MODULE_DIR/dkms/b9406-mute-led-$MUTE_DKMS_VERSION" kernel rc=0
+  local -a kernels=()
   kernel=$(uname -r)
   mute_remove_version "$MUTE_DKMS_OLD_VERSION"
 
-  if ! mute_kernel_needs_bridge "$kernel" || mute_native_speaker_led; then
+  mapfile -t kernels < <(mute_bridge_kernels)
+  if (( ${#kernels[@]} == 0 )); then
     mute_remove_version "$MUTE_DKMS_VERSION"
-    log "[mute-led-fix] $kernel already has platform::mute; DKMS bridge not installed"
+    log "[mute-led-fix] every installed kernel has platform::mute; DKMS bridge not installed"
     return 0
   fi
 
@@ -78,8 +93,7 @@ mute_ensure_dkms() {
   # Every installed kernel that lacks the native LED, not only the running one:
   # booting another installed kernel must not lose F1 until DKMS next runs.
   local k loaded=0
-  while IFS= read -r k; do
-    mute_kernel_needs_bridge "$k" || continue
+  for k in "${kernels[@]}"; do
     if ! kernel_headers_present "$k"; then
       warn "[mute-led-fix] skipping $k: matching headers are not installed"
       continue
@@ -92,7 +106,7 @@ mute_ensure_dkms() {
     fi
     (( rc == 0 )) || return "$rc"
     [[ $k == "$kernel" ]] && loaded=1
-  done < <(kernel_list)
+  done
   (( loaded )) || return 0
   modprobe b9406_mute_led
 }
@@ -137,7 +151,7 @@ mute_stop_user_sync() {
 }
 
 module_install() {
-  local tool kernel
+  local tool kernel bridge
   if [[ $(cat /sys/class/dmi/id/product_name) != "ASUS EXPERTBOOK B9406CAA" ]]; then
     warn "[mute-led-fix] only tested on ASUS EXPERTBOOK B9406CAA; skipping"
     return 10
@@ -151,24 +165,27 @@ module_install() {
     }
   done
 
-  if mute_kernel_needs_bridge "$kernel" && ! mute_native_speaker_led; then
+  bridge="$(mute_bridge_kernels)"
+  if [[ -n $bridge ]]; then
     for tool in dkms make; do
       command -v "$tool" >/dev/null || {
         warn "[mute-led-fix] missing $tool; see mute-led-fix/README.md prerequisites"
         return 1
       }
     done
+  fi
+  if grep -qxF -- "$kernel" <<<"$bridge"; then
     [[ -f /lib/modules/$kernel/build/Makefile ]] || {
       warn "[mute-led-fix] install matching headers for $kernel first"
       return 1
     }
-    mute_ensure_dkms
-  else
-    mute_ensure_dkms
   fi
+  mute_ensure_dkms
 
   mod_install_files
-  if ! mute_kernel_needs_bridge "$kernel" || mute_native_speaker_led; then
+  # The load entry stays while any installed kernel needs the bridge: on a
+  # kernel without the module, systemd-modules-load logs it and carries on.
+  if [[ -z $bridge ]]; then
     printf '%s\n' '# platform::mute is provided by the kernel; the DKMS module is not loaded.' \
       > /etc/modules-load.d/b9406-mute-led.conf
   fi
