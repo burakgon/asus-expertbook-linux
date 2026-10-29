@@ -64,8 +64,8 @@ sudo pacman -S --needed dkms base-devel linux-headers python libpulse brightness
 
 Use your kernel's matching header package instead of `linux-headers` for LTS,
 Zen or CachyOS, and the matching LLVM toolchain for a Clang-built kernel.
-Built and loaded on 7.2.3-arch1-3, 7.2.11-arch1-1 and CachyOS 7.3.0. Not
-built on 7.4 or newer. DKMS's normal kernel build settings apply; compiler
+Built on 7.2.3-arch1-3, 7.2.11-arch1-1 and CachyOS 7.3.0, and loaded on 7.2.3
+and 7.3.0. Not built on 7.4 or newer. DKMS's normal kernel build settings apply; compiler
 overrides can be supplied through DKMS config.
 
 ```sh
