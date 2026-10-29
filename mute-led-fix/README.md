@@ -79,8 +79,9 @@ headers is skipped with a warning; a failed build stops the install. The
 driver is loaded at once when the running kernel is one of those built. A
 running kernel that already has `platform::mute` from another driver is left
 alone. A registered 0.2 tree that differs from this checkout is not
-overwritten. DKMS version 0.1, from the previous revision of this module, is
-removed first.
+overwritten. DKMS version 0.1, from the first revision of this module, gives
+way kernel by kernel: it comes off a kernel only once 0.2 is built for it,
+goes back if 0.2 fails to install, and is removed once no kernel runs it.
 
 The session service is not enabled by the installer. As your desktop user:
 
