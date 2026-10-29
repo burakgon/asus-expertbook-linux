@@ -138,5 +138,53 @@ class EventMonitorTests(unittest.TestCase):
         self.monitor.poller.poll.assert_called_once_with(1)
 
 
+class SensorDiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.log = patch.object(kbd, "log").start()
+        patch.object(kbd, "Backlight").start()
+        patch.object(kbd, "read_proc_lid_state", return_value=None).start()
+        self.addCleanup(patch.stopall)
+        self.root = tempfile.TemporaryDirectory()
+        self.addCleanup(self.root.cleanup)
+
+    def sensor(self, name, lux):
+        path = os.path.join(self.root.name, name)
+        os.makedirs(path, exist_ok=True)
+        with open(os.path.join(path, "in_illuminance_raw"), "w") as fh:
+            fh.write("%d\n" % lux)
+        return kbd.AmbientSensor(path)
+
+    def controller(self, sensors):
+        find = patch.object(kbd.AmbientSensor, "find", side_effect=sensors).start()
+        controller = kbd.Controller(dict(kbd.DEFAULTS), dry_run=True)
+        return controller, find
+
+    def test_missing_sensor_at_start_waits_instead_of_exiting(self):
+        late = self.sensor("iio:device1", 40)
+        controller, _find = self.controller([None, None, late])
+        self.assertIsNone(controller.sensor)
+        self.assertIsNone(controller.sample())
+        self.assertEqual(controller.sample(), 40.0)
+        self.assertIs(controller.sensor, late)
+
+    def test_vanished_sensor_is_found_again_under_a_new_path(self):
+        first = self.sensor("iio:device1", 10)
+        controller, find = self.controller([first])
+        self.assertEqual(controller.sample(), 10.0)
+        os.remove(first.raw)
+        second = self.sensor("iio:device2", 10)
+        find.side_effect = [None, second]
+        self.assertIsNone(controller.sample())
+        self.assertEqual(controller.sample(), 10.0)
+        self.assertIs(controller.sensor, second)
+
+    def test_present_sensor_is_not_rediscovered_every_tick(self):
+        sensor = self.sensor("iio:device1", 5)
+        controller, find = self.controller([sensor])
+        for _ in range(3):
+            controller.sample()
+        find.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

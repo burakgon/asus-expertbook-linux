@@ -68,7 +68,7 @@
 
 MODULE_NAME="keyboard-backlight-auto"
 MODULE_DESC="Drive the keyboard backlight from the ambient light sensor (Windows 11 ALR curve)"
-MODULE_VERSION="1.3.0"
+MODULE_VERSION="1.3.1"
 
 MODULE_FILES=(
   "kbd-backlight-auto:/usr/local/bin/kbd-backlight-auto"
