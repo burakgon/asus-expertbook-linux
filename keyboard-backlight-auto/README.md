@@ -81,6 +81,15 @@ Normal `POLLPRI|POLLERR` notifications from `brightness_hw_changed` still
 deliver Fn-key overrides. Reinstalling the module now restarts the daemon so
 the updated code takes effect immediately.
 
+### Sensor arrives late (1.3.1)
+
+The `als` device only exists once the Intel Sensor Hub has loaded its firmware,
+about five seconds into boot, so the daemon used to start first, exit with "no
+ambient light sensor found" and come back on systemd's restart two seconds
+later. It now waits for the sensor, and finds it again when an ISH reset brings
+it back under a new `iio:deviceN`; until then the backlight is left alone.
+`--status` reports a missing sensor instead of failing.
+
 Regression tests: `python3 -m unittest discover -s tests -v`.
 
 ### Manual override (Fn keys)

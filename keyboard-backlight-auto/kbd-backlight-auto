@@ -420,9 +420,12 @@ class Controller:
             parse_override_lut, cfg["override_lut"], DEFAULT_OVERRIDE_LUT,
             "override table")
 
+        # The als device only appears once the Intel Sensor Hub has loaded its
+        # firmware, a few seconds into boot, and comes back under a new
+        # iio:deviceN after an ISH reset. Wait for it instead of exiting.
         self.sensor = AmbientSensor.find()
         if self.sensor is None:
-            raise SystemExit("no ambient light sensor (iio 'als' device) found")
+            log("no ambient light sensor (iio 'als' device) yet; waiting for it")
 
         self.backlight = Backlight(cfg["led"])
 
@@ -443,9 +446,23 @@ class Controller:
 
     # -- readings ---------------------------------------------------------
 
+    def find_sensor(self):
+        """The sensor to read this tick, re-found when it vanished or never
+        appeared. Logs only when it comes or goes."""
+        if self.sensor is not None and os.path.exists(self.sensor.raw):
+            return self.sensor
+        found = AmbientSensor.find()
+        if found is not None:
+            log("ambient light sensor: %s" % found.path)
+        elif self.sensor is not None:
+            log("ambient light sensor %s is gone; waiting for it" % self.sensor.path)
+        self.sensor = found
+        return found
+
     def sample(self):
         """One smoothed lux reading, or None if the sensor gave nothing."""
-        raw = self.sensor.lux()
+        sensor = self.find_sensor()
+        raw = sensor.lux() if sensor is not None else None
         if raw is None:
             return None
         lux = max(0.0, raw * self.calibration)
@@ -715,9 +732,13 @@ def run(controller):
 def print_status(cfg, controller):
     log("config file:      %s%s"
         % (CONFIG_PATH, "" if os.path.exists(CONFIG_PATH) else " (absent, using defaults)"))
-    log("sensor:           %s (scale=%g offset=%g)"
-        % (controller.sensor.path, controller.sensor.scale, controller.sensor.offset))
-    raw = controller.sensor.lux()
+    sensor = controller.sensor
+    if sensor is None:
+        log("sensor:           none (no iio 'als' device; is ish-firmware installed?)")
+    else:
+        log("sensor:           %s (scale=%g offset=%g)"
+            % (sensor.path, sensor.scale, sensor.offset))
+    raw = sensor.lux() if sensor is not None else None
     log("reading:          %s lux (calibration %g)"
         % ("unavailable" if raw is None else "%.2f" % (raw * controller.calibration),
            controller.calibration))
