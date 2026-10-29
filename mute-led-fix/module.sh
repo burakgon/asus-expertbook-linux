@@ -158,11 +158,11 @@ module_install() {
   fi
 
   kernel=$(uname -r)
+  # Only the optional session service needs these; the kernel triggers drive
+  # both LEDs without it.
   for tool in python3 pactl brightnessctl; do
-    command -v "$tool" >/dev/null || {
-      warn "[mute-led-fix] missing $tool; see mute-led-fix/README.md prerequisites"
-      return 1
-    }
+    command -v "$tool" >/dev/null ||
+      warn "[mute-led-fix] missing $tool, which expertbook-mute-leds.service needs; see mute-led-fix/README.md prerequisites"
   done
 
   bridge="$(mute_bridge_kernels)"

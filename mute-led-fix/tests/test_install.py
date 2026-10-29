@@ -10,7 +10,7 @@ MODULE = Path(__file__).parents[1] / "module.sh"
 
 class InstallTests(unittest.TestCase):
     def install(self, registered="", fail_build=False, native=False, kernel="7.2.3-arch1-3",
-                diff_ok=True, others=(), headerless=()):
+                diff_ok=True, others=(), headerless=(), missing=()):
         script = r'''
 set -euo pipefail
 source "$1"
@@ -22,7 +22,7 @@ cat() { echo 'ASUS EXPERTBOOK B9406CAA'; }
 uname() { echo "$KERNEL"; }
 kernel_list() { printf '%s\n' "$KERNEL" $OTHERS $HEADERLESS; }
 kernel_headers_present() { [[ -f $ROOT/lib/modules/$1/build/Makefile ]]; }
-command() { return 0; }
+command() { [[ " $MISSING " != *" ${!#} "* ]]; }
 install() { echo "write-source $*"; }
 chown() { echo chown; }
 chmod() { echo chmod; }
@@ -57,6 +57,7 @@ module_install
                 DIFF_OK=str(int(diff_ok)),
                 OTHERS=" ".join(others),
                 HEADERLESS=" ".join(headerless),
+                MISSING=" ".join(missing),
                 ROOT=str(root),
                 MUTE_DKMS_ROOT=str(root / "src"),
                 FIXTURE=str(root / "fixture"),
@@ -157,6 +158,19 @@ module_install
         self.assertNotIn("load-driver", result.stdout)
         self.assertIn("publish-config", result.stdout)
         self.assertNotIn("provided by the kernel", result.load_text)
+
+    def test_missing_sync_tools_only_warn(self):
+        result = self.install(missing=("pactl", "brightnessctl"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertIn("load-driver", result.stdout)
+        self.assertIn("missing pactl", result.stderr)
+        self.assertIn("missing brightnessctl", result.stderr)
+
+    def test_missing_dkms_still_fails_when_a_kernel_needs_the_bridge(self):
+        result = self.install(missing=("dkms",))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("publish-config", result.stdout)
 
     def test_native_led_on_the_running_kernel_still_bridges_older_kernels(self):
         result = self.install(native=True, others=("7.2.11-arch1-1",))
