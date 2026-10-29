@@ -1,0 +1,16 @@
+[Unit]
+Description=Synchronize ASUS ExpertBook mute indicator LEDs
+After=pipewire.service pipewire-pulse.service
+PartOf=graphical-session.target
+ConditionPathExists=|/sys/class/leds/platform::mute
+ConditionPathExists=|/sys/class/leds/platform::micmute
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/asus-expertbook/mute-led-sync.py
+Restart=on-failure
+RestartSec=3
+Environment=MUTE_LED_SPEAKER=auto
+Environment=MUTE_LED_MIC=auto
+
+[Install]
+WantedBy=graphical-session.target
