@@ -983,32 +983,72 @@ static int b9406caa_prune_ghost_rt722(struct device *dev,
  * bind with "CODEC DAI cs35l56-ot25 not registered". Point the link back at
  * cs35l56-sdw1c, as in 7.2.10: the codec registers that DAI with or without
  * the OT25 patch. 7.2.12 carries the codec half.
+ *
+ * The name has to change in snd-soc-sdw-utils' shared codec_info_list, not
+ * only in this card's links: asoc_sdw_rtd_init() looks the bound DAI up there
+ * by name. The new string lives in this module, so the original pointers are
+ * put back when the device unbinds or the probe fails (including a deferred
+ * probe), before this module and its string can go away.
  */
-static void b9406caa_fix_7_2_11_ot25(struct device *dev,
-				     struct asoc_sdw_mc_private *ctx)
-{
 #if LINUX_VERSION_CODE == KERNEL_VERSION(7, 2, 11)
+#define B9406CAA_OT25_MAX	8
+
+struct b9406caa_ot25_fix {
+	struct asoc_sdw_dai_info *dai[B9406CAA_OT25_MAX];
+	const char *orig[B9406CAA_OT25_MAX];
+	int count;
+};
+
+static void b9406caa_restore_ot25(void *data)
+{
+	struct b9406caa_ot25_fix *fix = data;
+	int i;
+
+	for (i = 0; i < fix->count; i++)
+		fix->dai[i]->dai_name = fix->orig[i];
+}
+
+static int b9406caa_fix_7_2_11_ot25(struct device *dev,
+				    struct asoc_sdw_mc_private *ctx)
+{
+	struct b9406caa_ot25_fix *fix;
 	struct asoc_sdw_dai_info *dai;
-	int fixed = 0;
 	int i, j;
 
 	if (!dmi_check_system(b9406caa_dmi_table))
-		return;
+		return 0;
+
+	fix = devm_kzalloc(dev, sizeof(*fix), GFP_KERNEL);
+	if (!fix)
+		return -ENOMEM;
 
 	for (i = 0; i < ctx->codec_info_list_count; i++) {
 		for (j = 0; j < codec_info_list[i].dai_num; j++) {
 			dai = &codec_info_list[i].dais[j];
-			if (dai->dai_name && !strcmp(dai->dai_name, "cs35l56-ot25")) {
-				dai->dai_name = "cs35l56-sdw1c";
-				fixed++;
-			}
+			if (!dai->dai_name || strcmp(dai->dai_name, "cs35l56-ot25"))
+				continue;
+			if (fix->count == B9406CAA_OT25_MAX)
+				break;
+			fix->dai[fix->count] = dai;
+			fix->orig[fix->count] = dai->dai_name;
+			fix->count++;
+			dai->dai_name = "cs35l56-sdw1c";
 		}
 	}
 
-	if (fixed)
-		dev_info(dev, "B9406CAA: Linux 7.2.11 lacks the cs35l56-ot25 DAI, using cs35l56-sdw1c\n");
-#endif
+	if (!fix->count)
+		return 0;
+
+	dev_info(dev, "B9406CAA: Linux 7.2.11 lacks the cs35l56-ot25 DAI, using cs35l56-sdw1c\n");
+	return devm_add_action_or_reset(dev, b9406caa_restore_ot25, fix);
 }
+#else
+static int b9406caa_fix_7_2_11_ot25(struct device *dev,
+				    struct asoc_sdw_mc_private *ctx)
+{
+	return 0;
+}
+#endif
 
 static int create_sdw_dailink(struct snd_soc_card *card,
 			      struct asoc_sdw_dailink *sof_dai,
@@ -1639,7 +1679,9 @@ static int mc_probe(struct platform_device *pdev)
 	for (i = 0; i < ctx->codec_info_list_count; i++)
 		codec_info_list[i].amp_num = 0;
 
-	b9406caa_fix_7_2_11_ot25(card->dev, ctx);
+	ret = b9406caa_fix_7_2_11_ot25(card->dev, ctx);
+	if (ret)
+		return ret;
 
 	ret = sof_card_dai_links_create(card);
 	if (ret < 0)

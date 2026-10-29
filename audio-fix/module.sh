@@ -252,6 +252,17 @@ audio_kernel_has_upstream_ghost_quirk() {
   [[ -n $marker ]]
 }
 
+# audio_kernel_fixed_upstream [kernel-release]
+#
+# The kernel's own sof_sdw brings the card up: it has the upstream ghost-RT722
+# quirk, and it is not 7.2.11, whose half-backported OT25 series needs the
+# overlay even where a distribution also backported the quirk.
+audio_kernel_fixed_upstream() {
+  local kernel="${1:-$(uname -r)}"
+  [[ ! $kernel =~ ^7\.2\.11([^0-9]|$) ]] &&
+    audio_kernel_has_upstream_ghost_quirk "$kernel"
+}
+
 # audio_kernel_predates_card [kernel-release]
 #
 # Before Linux 6.19 no machine driver matches this laptop's codecs
@@ -281,7 +292,7 @@ module_install_state() {
     some) echo partial; return ;;
   esac
 
-  if audio_kernel_has_upstream_ghost_quirk; then
+  if audio_kernel_fixed_upstream; then
     if audio_dkms_installed_for_kernel; then
       echo update-available
       return
@@ -412,7 +423,7 @@ audio_require_build_tools() {
 
   # Headers for the running kernel only when it gets the overlay; every other
   # kernel's headers are checked where it is built.
-  if audio_kernel_has_upstream_ghost_quirk || audio_kernel_predates_card; then
+  if audio_kernel_fixed_upstream || audio_kernel_predates_card; then
     return 0
   fi
   kernel_headers_present || \
@@ -433,7 +444,7 @@ audio_install_dkms() {
   # Before anything can install packages: a new headers package runs the DKMS
   # pacman hook, which reads every source under /usr/src as root.
   audio_secure_legacy_sources
-  if ! audio_kernel_has_upstream_ghost_quirk && ! audio_kernel_predates_card; then
+  if ! audio_kernel_fixed_upstream && ! audio_kernel_predates_card; then
     audio_require_build_tools
   fi
 
@@ -460,7 +471,7 @@ audio_install_dkms() {
       warn "[audio-fix] skipping $kernel: before Linux 6.19 no machine driver matches this laptop's codecs, so it has no speakers with or without the overlay"
       continue
     fi
-    if audio_kernel_has_upstream_ghost_quirk "$kernel"; then
+    if audio_kernel_fixed_upstream "$kernel"; then
       log "[audio-fix] $kernel contains upstream B9406CAA ghost-RT722 quirk; DKMS not needed"
       # Retire a build an earlier run or DKMS autoinstall left for it.
       if (( keep )) && [[ -n $(audio_dkms_state "$kernel") ]]; then
@@ -711,7 +722,7 @@ module_status_extra() {
   if audio_kernel_predates_card; then
     printf '  kernel:   %sLinux %s predates 6.19: no machine driver matches this laptop'\''s codecs, so there are no speakers on this kernel; boot 7.2 or newer%s\n' \
       "$c_warn" "$(uname -r)" "$c_off"
-  elif audio_kernel_has_upstream_ghost_quirk; then
+  elif audio_kernel_fixed_upstream; then
     if [[ $module_path == */updates/dkms/* ]]; then
       printf '  kernel:   %supstream B9406CAA quirk present; redundant DKMS is still selected — update audio-fix and reboot%s\n' \
         "$c_warn" "$c_off"
