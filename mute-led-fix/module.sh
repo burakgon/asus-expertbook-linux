@@ -207,8 +207,9 @@ module_status_extra() {
   local led trigger
   for led in platform::mute platform::micmute; do
     if [[ -r /sys/class/leds/$led/brightness ]]; then
-      trigger="?"
-      [[ -r /sys/class/leds/$led/trigger ]] && trigger="$(<"/sys/class/leds/$led/trigger")"
+      # The file lists every trigger; the selected one is in brackets.
+      trigger="$(grep -o '\[[^]]*\]' "/sys/class/leds/$led/trigger" 2>/dev/null | tr -d '[]' || true)"
+      [[ -n $trigger ]] || trigger="?"
       printf '  %s brightness: %s\n' "$led" "$(<"/sys/class/leds/$led/brightness")"
       printf '    trigger: %s\n' "$trigger"
     else
