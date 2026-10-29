@@ -21,3 +21,5 @@ jobs:
           done < <(git ls-files -z '*.sh')
       - name: Test keyboard backlight event handling
         run: python3 -m unittest discover -s tests -v
+      - name: Test the mute LED installer and synchronizer
+        run: python3 -m unittest discover -s mute-led-fix/tests -v

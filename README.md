@@ -291,8 +291,9 @@ longer forces `LLVM=1` on GCC-built kernels.
 | `dkms/asus-expertbook-sof-sdw-3.0.2/` | `/usr/src/` + `/lib/modules/*/updates/dkms/` | Compatibility overlay for released kernels lacking upstream commit `90af3209742d`; not built where the in-kernel DMI quirk is detected, and DKMS never builds it for 7.3+. Upgrades compile the new overlay for every kernel first and take the old one off a kernel only once its replacement exists. |
 
 > The **F1 speaker-mute LED** needs `asus-wmi`'s `platform::mute` (WMI device
-> `0x0004001C`), which lands in Linux 7.4. Until then only `platform::micmute`
-> exists; the kernel's `audio-micmute` trigger drives it.
+> `0x0004001C`), which lands in Linux 7.4. On older kernels
+> [`mute-led-fix`](mute-led-fix/) registers it. The F4 `platform::micmute`
+> already exists, and the kernel's `audio-micmute` trigger drives it.
 
 </details>
 
@@ -820,10 +821,11 @@ Linux 7.2 does not expose the speaker mute LED. This module registers
 `platform::mute` through the exported ASUS WMI API, with the kernel
 `audio-mute` trigger, and stops building once 7.4 provides that LED itself.
 An optional per-user service can follow speaker mute, microphone mute, or
-both; it leaves an LED alone while a kernel trigger owns it. Hardware
-confirmation so far is Omarchy on BIOS B9406CAA.312 and Linux 7.2.3.
-Suspend/resume and non-Omarchy desktops have not been retested with this
-revision. See [`mute-led-fix/README.md`](mute-led-fix/README.md).
+both; it leaves an LED alone while a kernel trigger owns it. The bridge is
+built for every installed kernel that needs it. Confirmed on two units on BIOS
+B9406CAA.312: Omarchy on Linux 7.2.3, and a Hyprland desktop on CachyOS 7.3.0
+and Arch 7.2.11, where the kernel triggers alone drove both LEDs and F1 stayed
+lit across s2idle. See [`mute-led-fix/README.md`](mute-led-fix/README.md).
 
 ```sh
 ./patch.sh install mute-led-fix
@@ -1065,9 +1067,9 @@ correctly. The **speaker-mute** LED (F1) stays in its EC default state
 before Linux 7.4, because until then this laptop exposes no speaker-mute LED
 device to Linux — there's nothing for the UCM `SetLED` hook to bind to.
 Linux 7.4's `asus-wmi` adds `platform::mute` (WMI device `0x0004001C`) with an
-audio-mute trigger. A bridge for older kernels is under review in
-[#16](https://github.com/burakgon/asus-expertbook-linux/pull/16). It's a
-missing-device limitation, not a profile issue.
+audio-mute trigger. On older kernels, [`mute-led-fix`](mute-led-fix/) adds the
+same LED through a small DKMS driver (`./patch.sh install mute-led-fix`). It's
+a missing-device limitation, not a profile issue.
 
 </details>
 

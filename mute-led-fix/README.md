@@ -4,10 +4,17 @@ On the ASUS ExpertBook Ultra B9406CAA, audio mute can work while the orange
 F1 speaker and F4 microphone indicators do not follow it. This module adds
 the missing speaker LED and an optional desktop-session synchronizer.
 
-Verified on **BIOS B9406CAA.312, Arch Linux 7.2.3-arch1-3, Omarchy with
-PipeWire and EasyEffects**. The laptop owner physically confirmed that both
-lights turn on when muted and off when unmuted after installing the fix.
-Other BIOS versions and desktops have not been hardware-tested.
+Verified on two units, both on BIOS B9406CAA.312:
+
+- **Arch Linux 7.2.3-arch1-3, Omarchy with PipeWire and EasyEffects.** The
+  laptop owner physically confirmed that both lights turn on when muted and
+  off when unmuted after installing the fix.
+- **CachyOS 7.3.0 (eevdf-lto and bore-lto) and Arch 7.2.11, a Hyprland
+  desktop with the stock HiFi UCM.** The kernel triggers drove both lights
+  without the session service: `pactl set-sink-mute` and Fn+F1 toggled F1,
+  read back through WMI, and F1 stayed lit across an s2idle suspend.
+
+Other BIOS versions have not been hardware-tested.
 
 ## What is missing
 
@@ -43,9 +50,11 @@ permissions or audio state. Readback is compared before writing.
 
 ## Install
 
-Prerequisites: DKMS, a kernel build toolchain, matching headers for the running
-kernel, Python 3, `pactl`, `brightnessctl`, systemd/logind, and a desktop audio
-server implementing the PulseAudio protocol (including `pipewire-pulse`).
+Prerequisites for the LED driver: DKMS, a kernel build toolchain and matching
+headers for each kernel that needs the bridge. The optional session service
+also needs Python 3, `pactl`, `brightnessctl`, systemd/logind, and a desktop
+audio server implementing the PulseAudio protocol (including `pipewire-pulse`);
+install only warns when those are missing.
 
 For Arch's standard `linux` kernel, the additional packages are usually:
 
@@ -55,19 +64,23 @@ sudo pacman -S --needed dkms base-devel linux-headers python libpulse brightness
 
 Use your kernel's matching header package instead of `linux-headers` for LTS,
 Zen or CachyOS, and the matching LLVM toolchain for a Clang-built kernel.
-Built and loaded on 7.2.3-arch1-3. Not built on 7.4 or newer. DKMS's normal
-kernel build settings apply; compiler overrides can be supplied through DKMS
-config.
+Built and loaded on 7.2.3-arch1-3, 7.2.11-arch1-1 and CachyOS 7.3.0. Not
+built on 7.4 or newer. DKMS's normal kernel build settings apply; compiler
+overrides can be supplied through DKMS config.
 
 ```sh
 ./patch.sh install mute-led-fix
 ```
 
 No reboot required on a kernel that still needs the bridge. The installer
-builds for the running kernel when that kernel is older than 7.4 and
-`platform::mute` is not already provided by another driver. A registered
-0.2 tree that differs from this checkout is not overwritten. DKMS version
-0.1, from the previous revision of this module, is removed first.
+builds the bridge for every installed kernel older than 7.4, not only the
+running one, so booting another kernel keeps F1. A kernel without matching
+headers is skipped with a warning; a failed build stops the install. The
+driver is loaded at once when the running kernel is one of those built. A
+running kernel that already has `platform::mute` from another driver is left
+alone. A registered 0.2 tree that differs from this checkout is not
+overwritten. DKMS version 0.1, from the previous revision of this module, is
+removed first.
 
 The session service is not enabled by the installer. As your desktop user:
 
@@ -115,7 +128,7 @@ Press the usual speaker/microphone mute shortcuts and also change mute through
 your audio panel. The corresponding orange light should follow within about
 one second. No root password should be needed for normal operation.
 
-Verification performed on the reference machine (Omarchy, BIOS B9406CAA.312,
+Verification performed on the first unit (Omarchy, BIOS B9406CAA.312,
 Linux 7.2.3-arch1-3):
 
 - Built the DKMS driver against the running kernel, installed and loaded it.
@@ -123,10 +136,22 @@ Linux 7.2.3-arch1-3):
 - Deliberately desynchronized each LED without changing audio; the service
   restored the expected state automatically.
 - The laptop owner confirmed both physical F1 and F4 indicators.
-- No non-Omarchy desktop was tested. Suspend and resume were not tested.
+
+On the second unit (Hyprland, CachyOS 7.3.0 running, 7.3.0 bore-lto and
+7.2.11-arch1-1 installed), without the session service:
+
+- `dkms status` listed the bridge for all three kernels.
+- `platform::mute` came up with `[audio-mute]` selected. UCM attaches
+  `cs42l43 Speaker Playback Switch` to the ALSA speaker LED, so
+  `pactl set-sink-mute` toggled it 1 → 0 → 1, read back through WMI.
+- F1 followed Fn+F1 and F4 followed `[audio-micmute]`, checked by eye.
+- Muted, suspended to s2idle and resumed: F1 was still lit and still on its
+  `audio-mute` trigger.
+
+The session service itself has not been tested across suspend/resume.
 
 For contributors, run `python -m unittest discover -s mute-led-fix/tests` for
-the synchronizer's routing and write-suppression tests.
+the installer and synchronizer tests.
 
 ## Uninstall
 
@@ -146,7 +171,8 @@ The stock microphone driver stays intact.
 
 This is a bridge for kernels before 7.4. Upstream has queued `platform::mute`
 with an `audio-mute` default trigger for 7.4, so the DKMS module is not built
-there. If `platform::mute` already exists and this module did not create it,
-install still publishes the synchronizer and does not load the DKMS driver.
-No claim is made that the queued kernel patch is in a release this machine is
-running.
+there. If the running kernel already has a `platform::mute` this module did
+not create, install does not load the DKMS driver, still builds it for older
+installed kernels, and still publishes the synchronizer. The bridge and its
+`modules-load.d` entry go only when no installed kernel needs them. No claim
+is made that the queued kernel patch is in a release this machine is running.
