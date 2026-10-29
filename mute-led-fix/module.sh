@@ -28,6 +28,16 @@ mute_dkms_registered() {
   [[ -n $status ]]
 }
 
+# State of version $1 on kernel $2: "installed", "built" or nothing.
+mute_dkms_state() {
+  local out
+  out="$(dkms status -m "$MUTE_DKMS_NAME" -v "$1" -k "$2" 2>/dev/null || true)"
+  case $out in
+    *", $2, "*": installed"*) echo installed ;;
+    *", $2, "*": built"*)     echo built ;;
+  esac
+}
+
 mute_native_speaker_led() {
   [[ -e /sys/class/leds/platform::mute && ! -d /sys/module/b9406_mute_led ]]
 }
@@ -66,17 +76,39 @@ mute_remove_version() {
   rm -rf -- "$source"
 }
 
+# 0.1, from the first revision of this module, stays only on a kernel that
+# still needs the bridge and has no 0.2 yet. It is taken off every other
+# kernel and removed once no kernel runs it.
+mute_retire_old_version() {
+  local k
+  local -a keep=()
+  while IFS= read -r k; do
+    [[ $(mute_dkms_state "$MUTE_DKMS_OLD_VERSION" "$k") == installed ]] || continue
+    if [[ " $* " == *" $k "* &&
+          $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") != installed ]]; then
+      keep+=("$k")
+      continue
+    fi
+    dkms uninstall -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"
+  done < <(kernel_list)
+  if (( ${#keep[@]} > 0 )); then
+    warn "[mute-led-fix] kept $MUTE_DKMS_NAME $MUTE_DKMS_OLD_VERSION on ${keep[*]}: 0.2 is not built there yet"
+    return 0
+  fi
+  mute_remove_version "$MUTE_DKMS_OLD_VERSION"
+}
+
 # A registered 0.2 whose tree differs from this checkout is left alone.
 # Rebuilding it in place would replace a module root already compiled.
 mute_ensure_dkms() {
-  local bundle="$MODULE_DIR/dkms/b9406-mute-led-$MUTE_DKMS_VERSION" kernel rc=0
-  local -a kernels=()
-  kernel=$(uname -r)
-  mute_remove_version "$MUTE_DKMS_OLD_VERSION"
+  local bundle="$MODULE_DIR/dkms/b9406-mute-led-$MUTE_DKMS_VERSION" running k rc old
+  local -a kernels=() built=()
+  running=$(uname -r)
 
   mapfile -t kernels < <(mute_bridge_kernels)
   if (( ${#kernels[@]} == 0 )); then
     mute_remove_version "$MUTE_DKMS_VERSION"
+    mute_remove_version "$MUTE_DKMS_OLD_VERSION"
     log "[mute-led-fix] every installed kernel has platform::mute; DKMS bridge not installed"
     return 0
   fi
@@ -92,22 +124,48 @@ mute_ensure_dkms() {
 
   # Every installed kernel that lacks the native LED, not only the running one:
   # booting another installed kernel must not lose F1 until DKMS next runs.
-  local k loaded=0
+  # Compile first: nothing installed changes while a build can still fail.
   for k in "${kernels[@]}"; do
     if ! kernel_headers_present "$k"; then
       warn "[mute-led-fix] skipping $k: matching headers are not installed"
       continue
     fi
+    case $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") in
+      installed|built) built+=("$k"); continue ;;
+    esac
     rc=0
-    dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$k" || rc=$?
+    dkms build -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$k" || rc=$?
     if (( rc == 77 )); then
       log "[mute-led-fix] DKMS skipped $k"
       continue
     fi
     (( rc == 0 )) || return "$rc"
-    [[ $k == "$kernel" ]] && loaded=1
+    built+=("$k")
   done
-  (( loaded )) || return 0
+
+  # Swap kernel by kernel: 0.1 comes off a kernel only once 0.2 is built for
+  # it, and goes back if 0.2 does not install.
+  for k in "${built[@]}"; do
+    [[ $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") == installed ]] && continue
+    old=0
+    if [[ $(mute_dkms_state "$MUTE_DKMS_OLD_VERSION" "$k") == installed ]]; then
+      dkms uninstall -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"
+      old=1
+    fi
+    rc=0
+    dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$k" || rc=$?
+    if (( rc != 0 )); then
+      if (( old )) &&
+         ! dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"; then
+        warn "[mute-led-fix] could not put $MUTE_DKMS_OLD_VERSION back on $k"
+      fi
+      return "$rc"
+    fi
+  done
+
+  mute_retire_old_version "${kernels[@]}"
+
+  [[ " ${built[*]} " == *" $running "* ]] || return 0
   modprobe b9406_mute_led
 }
 
@@ -143,8 +201,13 @@ mute_stop_user_sync() {
       "$home/.config/systemd/user/default.target.wants/expertbook-mute-leds.service"
     do
       if [[ -e $wants || -L $wants ]]; then
-        rm -f -- "$wants"
-        log "[mute-led-fix] removed $wants"
+        # As the user: the directories on the way are theirs, and root must
+        # not follow a link planted in them.
+        if runuser -u "$name" -- rm -f -- "$wants"; then
+          log "[mute-led-fix] removed $wants"
+        else
+          warn "[mute-led-fix] could not remove $wants; as $name: rm $wants"
+        fi
       fi
     done
   done
