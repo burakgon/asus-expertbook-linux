@@ -895,6 +895,10 @@ operations know whether each module is `up to date`, `update available`,
 | `./patch.sh update-all` | Re-install only modules that aren't `up to date`. |
 | `./patch.sh uninstall-all` | Tear down installed configuration modules; applied device firmware is not downgraded. |
 
+Commands that act on several modules carry on past one that fails, then list
+the failures and exit non-zero, so a single broken module no longer holds
+back the updates after it.
+
 ## Kernel & distro compatibility
 
 - **Linux 6.18+** for the haptic-touchpad kernel parser, the new `iwlmld`

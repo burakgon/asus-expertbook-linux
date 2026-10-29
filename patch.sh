@@ -403,18 +403,35 @@ do_status_one() {
   echo
 }
 
+# run_each <do_fn> <module>... -- run the per-module operation on every named
+# module, with errexit in force inside each, and carry on past a failure so
+# one broken module does not hold back the rest. Fails at the end if any did.
+run_each() {
+  local fn="$1" m
+  local -a failed=()
+  shift
+  # A mistyped name stops the run before anything is changed.
+  for m in "$@"; do
+    [[ -f $ROOT_DIR/$m/module.sh ]] || die "no such module: $m (try: list)"
+  done
+  for m in "$@"; do
+    run_errexit with_module "$m" "$fn"
+    (( RUN_ERREXIT_RC == 0 )) || failed+=("$m")
+  done
+  (( ${#failed[@]} == 0 )) ||
+    die "failed: ${failed[*]} ($(( $# - ${#failed[@]} )) of $# modules went through; see the errors above)"
+}
+
 cmd_install() {
   require_root install "$@"
   (( $# > 0 )) || die "install: at least one module name required (try: list)"
-  local m
-  for m in "$@"; do with_module "$m" do_install_one; done
+  run_each do_install_one "$@"
 }
 
 cmd_uninstall() {
   require_root uninstall "$@"
   (( $# > 0 )) || die "uninstall: at least one module name required"
-  local m
-  for m in "$@"; do with_module "$m" do_uninstall_one; done
+  run_each do_uninstall_one "$@"
 }
 
 cmd_install_all() {
