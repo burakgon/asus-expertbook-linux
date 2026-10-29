@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://burakgon.github.io/asus-expertbook-linux/og.svg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — thirteen modules including ambient-light keyboard backlight and verified camera firmware">
+<meta property="og:image:alt" content="ASUS ExpertBook Ultra Linux fixes — fourteen modules including ambient-light keyboard backlight and verified camera firmware">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ASUS ExpertBook Ultra B9406CAA on Linux">
@@ -374,7 +374,7 @@
       <span class="eyebrow">2026 · Panther Lake · B9406CAA</span>
       <h1>ASUS ExpertBook Ultra on&nbsp;Linux,<br>without the broken bits.</h1>
       <p class="lede">
-        Thirteen focused, versioned modules that turn
+        Fourteen focused, versioned modules that turn
         the 2026 ASUS ExpertBook Ultra (B9406CAA) into a working Linux laptop —
         without manually rebuilding the kernel. Configuration changes are
         reversible; camera firmware is separately confirmed before staging.
@@ -751,19 +751,20 @@ sudo reboot</code></pre>
 
   #   Module                    Version    Installed  State          Description
   --------------------------------------------------------------------------------------
-  1   audio-fix                 3.2.0      3.2.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
+  1   audio-fix                 3.3.0      3.3.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
   2   camera-firmware           3009       3009       up to date     Verified camera UEFI capsule
-  3   display-fix               1.4.0      1.4.0      up to date     PSR1 self-refresh + DPCD brightness
+  3   display-fix               1.5.0      1.5.0      up to date     PSR1 self-refresh + DPCD brightness
   4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
   5   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
-  7   keyboard-backlight-auto   1.3.0      1.3.0      up to date     Ambient-light keyboard backlight
+  7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
-  9   power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
-  10  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
-  11  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
-  12  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
-  13  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
+  9   mute-led-fix              1.1.0      1.1.0      up to date     F1/F4 mute indicator LEDs
+  10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
+  11  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
+  12  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
+  13  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
+  14  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
 
 Actions
   i &lt;num&gt;    install / update module
@@ -785,7 +786,7 @@ Actions
 
   <section id="modules">
     <div class="wrap">
-      <h2>The thirteen modules</h2>
+      <h2>The fourteen modules</h2>
       <p class="sub">
         Each is a self-contained folder with a manifest, a payload, and a
         README. Click any module to open the bug story and the file-level
@@ -799,7 +800,7 @@ Actions
         <tbody>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/audio-fix"><code>audio-fix</code></a></td>
-            <td><span class="mono">3.2.0</span></td>
+            <td><span class="mono">3.3.0</span></td>
             <td>Adaptive B9406CAA ghost-RT722 compatibility + HiFi UCM; DKMS only on kernels lacking the upstream quirk, bundled CS35L56 firmware only on <code>linux-firmware-cirrus &lt; 20260519</code></td>
           </tr>
           <tr>
@@ -809,7 +810,7 @@ Actions
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/display-fix"><code>display-fix</code></a></td>
-            <td><span class="mono">1.4.0</span></td>
+            <td><span class="mono">1.5.0</span></td>
             <td>PSR1 self-refresh plus forced VESA DPCD backlight for working brightness</td>
           </tr>
           <tr>
@@ -829,13 +830,18 @@ Actions
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/keyboard-backlight-auto"><code>keyboard-backlight-auto</code></a></td>
-            <td><span class="mono">1.3.0</span></td>
+            <td><span class="mono">1.3.1</span></td>
             <td><em>(optional)</em> Keyboard backlight follows the ambient light sensor, using Windows 11's documented ALR curve; off with the lid shut</td>
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/keyboard-backlight-fix"><code>keyboard-backlight-fix</code></a></td>
             <td><span class="mono">2.0.0</span></td>
             <td><em>(superseded)</em> The v1.x <code>asusd</code> workaround and why it was wrong — skips its own install</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/mute-led-fix"><code>mute-led-fix</code></a></td>
+            <td><span class="mono">1.1.0</span></td>
+            <td>F1 speaker-mute LED as <code>platform::mute</code> with the kernel's <code>audio-mute</code> trigger on kernels before 7.4, built for every installed kernel; optional per-user sync</td>
           </tr>
           <tr>
             <td><a href="https://github.com/burakgon/asus-expertbook-linux/tree/main/power-profile-bridge"><code>power-profile-bridge</code></a></td>
@@ -1008,11 +1014,18 @@ cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200, TID: 0x84b06
           kernels, so a 7.3+ kernel update keeps the kernel's own, newer
           <code>sof_sdw</code>; an overlay upgrade compiles for every kernel
           first and takes the old overlay off a kernel only once its
-          replacement exists.
+          replacement exists. Overlay 3.0.3 (<code>audio-fix</code> 3.3.0)
+          brings the card back on Linux 7.2.11, whose stable update took only
+          half of the CS35L56 OT25 series (<code>CODEC DAI cs35l56-ot25 not
+          registered</code>,
+          <a href="https://github.com/burakgon/asus-expertbook-linux/issues/28">#28</a>),
+          and narrows DKMS to 6.19–7.2: before 6.19, the 6.18 LTS included, no
+          machine driver matches this laptop's codecs, so those kernels are
+          skipped with a warning instead of failing the install.
         </p>
-        <p><strong>Files installed (v3.2.0):</strong></p>
+        <p><strong>Files installed (v3.3.0):</strong></p>
         <ul>
-          <li><code>/usr/src/asus-expertbook-sof-sdw-3.0.2/</code> and <code>/lib/modules/*/updates/dkms/</code> — board-scoped compatibility filter, built only for kernels lacking upstream commit <code>90af3209742d</code> (never by DKMS for 7.3+); install also regenerates initramfs images</li>
+          <li><code>/usr/src/asus-expertbook-sof-sdw-3.0.3/</code> and <code>/lib/modules/*/updates/dkms/</code> — board-scoped compatibility filter, built only for 6.19–7.2 kernels lacking upstream commit <code>90af3209742d</code> (never by DKMS for 7.3+ or before 6.19); on 7.2.11 it also restores the CS35L56 feedback DAI. Install also regenerates initramfs images</li>
           <li><code>/etc/wireplumber/wireplumber.conf.d/52-disable-bt-sco-offload.conf</code> — disables the dead SSP2-BT offload PCM so its probe stops spamming the log on pre-7.1 kernels (inert on 7.1+, where the PCM no longer exists); Bluetooth audio still works through PipeWire</li>
           <li><em>Only on <code>linux-firmware-cirrus &lt; 20260519</code> (newer packages ship identical files, and the bundled copies are removed there):</em> <code>/lib/firmware/cirrus/cs35l56-b0-dsp1-misc-104315e4-l2u{0,1}.bin</code> per-OEM tuning blobs and the matching <code>.wmfw</code> files, the generic CS35L56 Rev 3.13.4 firmware patch (chip ROM upgrades 3.4.4 → 3.13.4)</li>
           <li><em>HiFi UCM — only on <code>alsa-ucm-conf &lt; 1.2.16</code> (1.2.16+ ships it in the package):</em> <code>sof-soundwire.conf</code> (fixed <code>-spk</code> regex), the <code>cs35l56+cs42l43-spk</code> / <code>cs42l43-spk+cs35l56</code> speaker confs, and <code>codecs/cs42l43-spk+cs35l56/init.conf</code></li>
@@ -1021,8 +1034,9 @@ cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200, TID: 0x84b06
         <p>
           The <strong>F1 speaker-mute LED</strong> needs <code>asus-wmi</code>'s
           <code>platform::mute</code> (WMI device <code>0x0004001C</code>), which
-          lands in Linux 7.4. Until then only <code>platform::micmute</code>
-          exists; the kernel's <code>audio-micmute</code> trigger drives it.
+          lands in Linux 7.4. On older kernels <code>mute-led-fix</code>
+          registers it. The F4 <code>platform::micmute</code> already exists,
+          and the kernel's <code>audio-micmute</code> trigger drives it.
         </p>
       </details>
 
@@ -1119,7 +1133,7 @@ cs35l56 sdw:0:2:01fa:3556:01:0: Tuning PID: 0x23134, SID: 0x470200, TID: 0x84b06
         <p><strong>Files installed:</strong></p>
         <ul>
           <li><code>/etc/modprobe.d/xe-dpcd-backlight.conf</code> — <code>enable_dpcd_backlight=2 enable_panel_replay=0 enable_psr=1</code> for any late module load</li>
-          <li><code>/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf</code> — appends <code>xe.enable_dpcd_backlight=2 xe.enable_panel_replay=0 xe.enable_psr=1</code>; the post-install hook calls <code>limine-update</code></li>
+          <li><code>/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf</code> — Limine only: appends <code>xe.enable_dpcd_backlight=2 xe.enable_panel_replay=0 xe.enable_psr=1</code>; the post-install hook calls <code>limine-update</code>. Since 1.5.0, kernelstub (Pop!_OS) and GRUB get the same three parameters through <code>lib/distro.sh</code></li>
         </ul>
         <p>
           Install removes the old <code>xe-disable-psr.conf</code>, which
@@ -1654,6 +1668,34 @@ EC set level 0/3 | manual override active for 0.0-18.4 lux (reading 9.2)</code><
         </p>
         <pre><code>sudo KBF_FORCE=1 ./patch.sh install keyboard-backlight-fix</code></pre>
       </details>
+
+      <details>
+        <summary><code>mute-led-fix</code> — the F1 speaker-mute light before Linux 7.4</summary>
+        <p>
+          The firmware implements the F1 speaker-mute LED at ASUS WMI device
+          <code>0x0004001C</code>, but <code>asus-wmi</code> only registers it
+          as <code>platform::mute</code> from Linux 7.4. Before that, nothing
+          exists for the kernel's ALSA LED trigger or the UCM to drive, so F1
+          never lights. F4 (<code>platform::micmute</code>) already works.
+        </p>
+        <p><strong>Files installed:</strong></p>
+        <ul>
+          <li><code>/usr/src/b9406-mute-led-0.2/</code> and <code>/lib/modules/*/updates/dkms/</code> — a small GPL-2.0 driver on the exported ASUS WMI API that registers <code>platform::mute</code> with the <code>audio-mute</code> default trigger; DMI-gated to this product, checks firmware presence, refuses a name another driver already took, built for every installed kernel before 7.4</li>
+          <li><code>/etc/modules-load.d/b9406-mute-led.conf</code> — loads it at boot</li>
+          <li><code>/usr/local/lib/asus-expertbook/mute-led-sync.py</code> and <code>/etc/systemd/user/expertbook-mute-leds.service</code> — optional per-user sync, not enabled by install; it leaves an LED alone while a kernel trigger owns it</li>
+        </ul>
+        <pre class="term"><code>./patch.sh install mute-led-fix
+./patch.sh status mute-led-fix</code></pre>
+        <p>
+          With the stock HiFi UCM the kernel triggers drive both lights without
+          the sync service, F1 included, and F1 stays lit across s2idle. Written
+          by <a href="https://github.com/argrig666">argrig666</a> in
+          <a href="https://github.com/burakgon/asus-expertbook-linux/pull/16">#16</a>
+          and finished by <a href="https://github.com/tattwamashi">tattwamashi</a> in
+          <a href="https://github.com/burakgon/asus-expertbook-linux/pull/30">#30</a>.
+          See <a href="https://github.com/burakgon/asus-expertbook-linux/blob/main/mute-led-fix/README.md"><code>mute-led-fix/README.md</code></a>.
+        </p>
+      </details>
     </div>
   </section>
 
@@ -1675,8 +1717,10 @@ EC set level 0/3 | manual override active for 0.0-18.4 lux (reading 9.2)</code><
         discovery, initramfs regeneration, kernel-cmdline backend
         (Limine / kernelstub / GRUB) and service enablement, and modules are
         being moved onto it one at a time. Working there today:
-        <code>touchpad-fix</code>, <code>wifi-fix</code> (config files only)
-        and <code>intel-perf-fix</code>. Progress is tracked in
+        <code>touchpad-fix</code>, <code>wifi-fix</code>,
+        <code>keyboard-backlight-auto</code>, <code>intel-perf-fix</code> and,
+        since 1.5.0, <code>display-fix</code> on kernelstub and GRUB. Progress
+        is tracked in
         <a href="https://github.com/burakgon/asus-expertbook-linux/issues/4">issue&nbsp;#4</a>.
       </p>
 
@@ -1840,8 +1884,9 @@ EC set level 0/3 | manual override active for 0.0-18.4 lux (reading 9.2)</code><
           speaker-mute LED device — there's nothing for the UCM
           <code>SetLED</code> hook to bind to. Linux 7.4's <code>asus-wmi</code>
           adds <code>platform::mute</code> (WMI device <code>0x0004001C</code>)
-          with an audio-mute trigger. It's a missing-device limitation, not a
-          profile issue.
+          with an audio-mute trigger; on older kernels
+          <code>mute-led-fix</code> adds the same LED through a small DKMS
+          driver. It's a missing-device limitation, not a profile issue.
         </p>
       </details>
 

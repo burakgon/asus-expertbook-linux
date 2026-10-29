@@ -147,19 +147,20 @@ typing single letters. Numbered table, color-coded state, cached.
 
   #   Module                    Version    Installed  State          Description
   --------------------------------------------------------------------------------------
-  1   audio-fix                 3.2.0      3.2.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
+  1   audio-fix                 3.3.0      3.3.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
   2   camera-firmware           3009       3009       up to date     Verified camera UEFI capsule
-  3   display-fix               1.4.0      1.4.0      up to date     PSR1 self-refresh + DPCD brightness
+  3   display-fix               1.5.0      1.5.0      up to date     PSR1 self-refresh + DPCD brightness
   4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
   5   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
-  7   keyboard-backlight-auto   1.3.0      1.3.0      up to date     Ambient-light keyboard backlight
+  7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
-  9   power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
-  10  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
-  11  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
-  12  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
-  13  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
+  9   mute-led-fix              1.1.0      1.1.0      up to date     F1/F4 mute indicator LEDs
+  10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
+  11  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
+  12  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
+  13  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
+  14  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
 
 Actions
   i <num>    install / update module (idempotent — re-runs post hooks)
