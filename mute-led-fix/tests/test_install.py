@@ -10,7 +10,7 @@ MODULE = Path(__file__).parents[1] / "module.sh"
 
 class InstallTests(unittest.TestCase):
     def install(self, registered="", fail_build=False, native=False, kernel="7.2.3-arch1-3",
-                diff_ok=True):
+                diff_ok=True, others=(), headerless=()):
         script = r'''
 set -euo pipefail
 source "$1"
@@ -20,6 +20,8 @@ log() { :; }
 die() { printf '%s\n' "$*" >&2; exit 1; }
 cat() { echo 'ASUS EXPERTBOOK B9406CAA'; }
 uname() { echo "$KERNEL"; }
+kernel_list() { printf '%s\n' "$KERNEL" $OTHERS $HEADERLESS; }
+kernel_headers_present() { [[ -f $ROOT/lib/modules/$1/build/Makefile ]]; }
 command() { return 0; }
 install() { echo "write-source $*"; }
 chown() { echo chown; }
@@ -30,15 +32,17 @@ diff() { [[ $DIFF_OK == 1 ]]; }
 dkms() {
   local cmd=$1 version=""
   shift
+  KERNEL_ARG=""
   while [[ $# -gt 0 ]]; do
     if [[ $1 == -v ]]; then version=$2; shift 2; continue; fi
+    if [[ $1 == -k ]]; then KERNEL_ARG=$2; shift 2; continue; fi
     shift
   done
   if [[ $cmd == status ]]; then
     [[ " $REGISTERED " == *" $version "* ]] && echo installed
     return 0
   fi
-  echo "dkms-$cmd-$version"
+  echo "dkms-$cmd-$version${KERNEL_ARG:+-$KERNEL_ARG}"
   if [[ $cmd == install && $FAIL_BUILD == 1 ]]; then return 42; fi
 }
 module_install
@@ -51,6 +55,9 @@ module_install
                 FAIL_BUILD=str(int(fail_build)),
                 KERNEL=kernel,
                 DIFF_OK=str(int(diff_ok)),
+                OTHERS=" ".join(others),
+                HEADERLESS=" ".join(headerless),
+                ROOT=str(root),
                 MUTE_DKMS_ROOT=str(root / "src"),
                 FIXTURE=str(root / "fixture"),
             )
@@ -59,9 +66,10 @@ module_install
             (bundle / "dkms.conf").write_text("PACKAGE_VERSION=0.2\n")
             (bundle / "Makefile").write_text("obj-m += b9406_mute_led.o\n")
             (bundle / "b9406_mute_led.c").write_text("/* fixture */\n")
-            headers = root / "lib/modules" / kernel / "build"
-            headers.mkdir(parents=True)
-            (headers / "Makefile").touch()
+            for release in (kernel, *others):
+                headers = root / "lib/modules" / release / "build"
+                headers.mkdir(parents=True)
+                (headers / "Makefile").touch()
             if not native:
                 (root / "sys/module/b9406_mute_led").mkdir(parents=True)
             else:
@@ -90,7 +98,7 @@ module_install
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("write-source", result.stdout)
         self.assertNotIn("dkms-add-0.2", result.stdout)
-        self.assertIn("dkms-install-0.2", result.stdout)
+        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
         self.assertIn("publish-config", result.stdout)
 
     def test_old_registration_is_removed_before_0_2_is_added(self):
@@ -122,6 +130,22 @@ module_install
         self.assertNotIn("dkms-add-0.2", result.stdout)
         self.assertIn("publish-config", result.stdout)
         self.assertIn("provided by the kernel", result.load_text)
+
+    def test_every_installed_kernel_that_needs_the_bridge_is_built(self):
+        result = self.install(others=("7.3.0-2-cachyos-bore-lto", "7.4.1-arch1-1"),
+                              headerless=("7.2.11-arch1-1",))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertIn("dkms-install-0.2-7.3.0-2-cachyos-bore-lto", result.stdout)
+        self.assertNotIn("7.4.1-arch1-1", result.stdout)
+        self.assertNotIn("dkms-install-0.2-7.2.11-arch1-1", result.stdout)
+        self.assertIn("skipping 7.2.11-arch1-1", result.stderr)
+        self.assertEqual(result.stdout.count("load-driver"), 1)
+
+    def test_a_failed_build_for_another_kernel_still_fails_the_install(self):
+        result = self.install(fail_build=True, others=("7.3.0-2-cachyos-bore-lto",))
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assertNotIn("publish-config", result.stdout)
 
 
 def subprocess_run(script, manifest, environment, root):

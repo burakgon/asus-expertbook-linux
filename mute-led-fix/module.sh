@@ -75,12 +75,25 @@ mute_ensure_dkms() {
     mute_install_source
   fi
 
-  dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$kernel" || rc=$?
-  if (( rc == 77 )); then
-    log "[mute-led-fix] DKMS skipped $kernel"
-    return 0
-  fi
-  (( rc == 0 )) || return "$rc"
+  # Every installed kernel that lacks the native LED, not only the running one:
+  # booting another installed kernel must not lose F1 until DKMS next runs.
+  local k loaded=0
+  while IFS= read -r k; do
+    mute_kernel_needs_bridge "$k" || continue
+    if ! kernel_headers_present "$k"; then
+      warn "[mute-led-fix] skipping $k: matching headers are not installed"
+      continue
+    fi
+    rc=0
+    dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$k" || rc=$?
+    if (( rc == 77 )); then
+      log "[mute-led-fix] DKMS skipped $k"
+      continue
+    fi
+    (( rc == 0 )) || return "$rc"
+    [[ $k == "$kernel" ]] && loaded=1
+  done < <(kernel_list)
+  (( loaded )) || return 0
   modprobe b9406_mute_led
 }
 
