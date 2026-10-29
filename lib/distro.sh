@@ -347,6 +347,10 @@ _grub_write_options() {
     return 1
   }
 
+  _grub_regen
+}
+
+_grub_regen() {
   if command -v update-grub >/dev/null 2>&1; then
     update-grub
   elif command -v grub-mkconfig >/dev/null 2>&1; then
@@ -391,7 +395,8 @@ cmdline_configured() {
 }
 
 # cmdline_add <param>... -- idempotent. Returns non-zero when the parameters
-# were staged but the bootloader could not be regenerated.
+# were staged but the bootloader could not be regenerated. GRUB is regenerated
+# on every call, so running it again retries a failed grub-mkconfig.
 cmdline_add() {
   (( $# > 0 )) || return 0
   local param opts changed=0 rc=0
@@ -428,6 +433,10 @@ cmdline_add() {
         opts="${opts#"${opts%%[![:space:]]*}"}"
         opts="${opts%"${opts##*[![:space:]]}"}"
         _grub_write_options "$opts" || rc=1
+      else
+        # Already in /etc/default/grub, possibly from a run whose regeneration
+        # failed: regenerate anyway so grub.cfg cannot stay behind.
+        _grub_regen || rc=1
       fi
       ;;
     *)
@@ -480,6 +489,8 @@ cmdline_remove() {
       if (( changed )); then
         new="${new%"${new##*[![:space:]]}"}"
         _grub_write_options "$new" || rc=1
+      else
+        _grub_regen || rc=1
       fi
       ;;
     *)
