@@ -395,7 +395,7 @@ The upstream fix, "drm/i915/dp: Handle VSC SDP revision 7 in unpack"
 | File | Path | What it does |
 |---|---|---|
 | `xe-dpcd-backlight.conf` | `/etc/modprobe.d/` | `enable_dpcd_backlight=2 enable_panel_replay=0 enable_psr=1` for a late xe module load. |
-| `limine-display.conf` | `/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf` | Adds `xe.enable_dpcd_backlight=2 xe.enable_panel_replay=0 xe.enable_psr=1` to every Limine kernel entry. Value `2` forces the VESA AUX/DPCD interface when sysfs brightness otherwise changes without changing panel luminance. |
+| `limine-display.conf` | `/etc/limine-entry-tool.d/90-asus-expertbook-linux-display.conf` | Limine only: adds `xe.enable_dpcd_backlight=2 xe.enable_panel_replay=0 xe.enable_psr=1` to every Limine kernel entry. Value `2` forces the VESA AUX/DPCD interface when sysfs brightness otherwise changes without changing panel luminance. On kernelstub (Pop!_OS) and GRUB the same three parameters go through [`lib/distro.sh`](lib/distro.sh) instead (since 1.5.0). |
 
 PSR1 (full-frame self-refresh without selective update) passes everything
 testable on this panel: vivid colors across HDR off/on toggles, a smooth
@@ -433,9 +433,13 @@ appears without a PSR2 disable, when `xe.enable_psr=0` turns self-refresh off,
 and when the panel's debugfs status reports anything but PSR1 (with VRR
 active the driver keeps PSR off, so the debugfs line reads `disabled`).
 
-GRUB users put the same three parameters on `GRUB_CMDLINE_LINUX_DEFAULT` in
-`/etc/default/grub` and run `grub-mkconfig -o /boot/grub/grub.cfg`; the
-modprobe.d half of the module still applies.
+Version 1.5 installs on more than Limine
+([#24](https://github.com/burakgon/asus-expertbook-linux/pull/24)). On
+kernelstub (Pop!_OS) the parameters go through `kernelstub -a`; on GRUB they
+are appended to `GRUB_CMDLINE_LINUX_DEFAULT` in `/etc/default/grub` and the
+config is regenerated. Uninstall takes the same three parameters off again.
+systemd-boot and other loaders are not handled: install stops and names the
+three parameters to add by hand, and the modprobe.d half still applies.
 
 </details>
 
@@ -916,7 +920,7 @@ operations know whether each module is `up to date`, `update available`,
   | `wifi-fix` | works | config files only |
   | `keyboard-backlight-auto` | works | config files plus a python3 daemon and its unit; no package manager involved |
   | `intel-perf-fix` | partial | `thermald` works (Ubuntu 24.04's `2.5.6-2ubuntu0.24.04.3` carries the Panther Lake backport). `intel-lpmd` is absent on Debian and, on Ubuntu 24.04, too old (0.0.3) to recognise Panther Lake — it installs and exits at once. Both cases are reported, not hidden |
-  | `display-fix` | not yet | needs the cmdline backend wired into the module |
+  | `display-fix` | works | 1.5.0 writes the parameters through the cmdline backend. Tested on Pop!_OS 24.04 with kernelstub: PSR1 and the DPCD backlight active after a reboot, `intel_backlight` on the DPCD scale, brightness keys working. The GRUB path was exercised against a scratch config |
   | `audio-fix` | not yet | Measured on Pop!_OS 24.04 against an earlier version. Fixed since: `dkms.conf` no longer forces `LLVM=1` (3.1.1), and overlay 3.0.2 is limited to 6.x–7.2 kernels and keeps going when one kernel fails to build. Still open: `audio_require_build_tools` installs `clang`, which GCC-built Debian kernels do not need; the bundled UCM files declare Syntax 7, which needs alsa-lib >= 1.2.12 (Ubuntu 24.04 ships 1.2.11), so installing them breaks UCM for the whole `sof-soundwire` family; the `NoExtract` pin maps to `dpkg-divert`; firmware ownership checks use `pacman -Qo` |
   | `camera-firmware` | not yet | needs `fwupd`, `jq`, `7z`, `curl` mapped to Debian names |
   | `ish-firmware` | untested | installs files only, but needs `7z` and `curl` and checks ownership with `pacman -Qo` |
@@ -926,13 +930,11 @@ operations know whether each module is `up to date`, `update available`,
   | `webcam-ai-fix`, `keyboard-backlight-fix` | not planned | depend on AUR-only packages (`obs-backgroundremoval`, `asusctl`); `keyboard-backlight-fix` is superseded by `keyboard-backlight-auto` anyway |
 
   Tracking issue: [#4](https://github.com/burakgon/asus-expertbook-linux/issues/4).
-- **Bootloader assumption (display-fix):** `limine` via
-  `limine-mkinitcpio-hook`, where `/etc/limine-entry-tool.d/` drop-ins are the
-  source of truth. If you use systemd-boot or GRUB, the module's
-  cmdline-injection hook needs swapping; the modprobe.d half still works.
-  `lib/distro.sh` already implements all three backends
-  (`cmdline_backend` → `limine` | `kernelstub` | `grub`); the module itself
-  has not been migrated onto them yet.
+- **Bootloaders (display-fix):** Limine via `limine-mkinitcpio-hook`, where
+  `/etc/limine-entry-tool.d/` drop-ins are the source of truth, kernelstub and
+  GRUB, through `lib/distro.sh` (`cmdline_backend` → `limine` | `kernelstub` |
+  `grub`). systemd-boot is not handled yet: add the three parameters to the
+  kernel cmdline by hand; the modprobe.d half still works.
 
 ## Adding a new module or model
 
