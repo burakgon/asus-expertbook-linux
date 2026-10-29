@@ -55,7 +55,7 @@ time via [`lib/distro.sh`](lib/distro.sh).
 |---|---|---|---|
 | **PixArt I²C-HID** haptic touchpad `093A:4F05` (ACPI `ASCP1D80`) | **Touchpad doesn't move the cursor.** Kernel log spams `kernel bug: Touch jump detected and discarded.` libinput rejects every event. A separate `i2c_designware.0` wedge can freeze the whole desktop; see [below](#if-the-desktop-freezes). | Cursor responds to light touches like any normal laptop. Zero "Touch jump" lines. The bus wedge is a kernel stall the quirk does not prevent. | [`touchpad-fix`](touchpad-fix/) |
 | **PixArt haptic touchpad** (Windows Precision pressure pad) | **No click-force or haptic-strength setting.** MyASUS sets both on Windows; Linux has no control, and the firmware forgets them at power-off. | *(optional)* `touchpad-haptics set --click-force light --intensity 30`, saved values restored whenever the pad appears. Standard HID feature reports only, verified against the pad's descriptor. | [`touchpad-haptics`](touchpad-haptics/) |
-| **F1 / F4 mute indicator LEDs** | Audio mute works, but the orange lights do not follow it. Linux 7.2 has no `platform::mute` for this board. | A DKMS bridge registers the speaker LED with the `audio-mute` trigger on kernels before 7.4. Speaker and microphone sync can be enabled separately. | [`mute-led-fix`](mute-led-fix/) |
+| **F1 / F4 mute indicator LEDs** | Audio mute works, but the orange lights do not follow it. Linux 7.2 has no `platform::mute` for this board. | A DKMS bridge registers the speaker LED with the `audio-mute` trigger on 6.19–7.3 kernels. Speaker and microphone sync can be enabled separately. | [`mute-led-fix`](mute-led-fix/) |
 | **Cirrus CS42L43** codec + 2× **CS35L56** speaker amps (PCI subsystem `1043:15e4`) | **Dummy Output / silent speakers.** A ghost RT722 can abort ALSA card registration; older userspace also lacks tuning/UCM. | Uses the accepted in-kernel B9406 quirk when present and DKMS only on older kernels; HiFi routing and calibrated amps work. | [`audio-fix`](audio-fix/) |
 | **Intel Wi-Fi 7 BE211** Panther Lake CNVi (`8086:e440`) | **Wi-Fi 7 (802.11be / EHT) is unstable.** EHT RX can collapse to MCS0/NSS1 and MLO sessions tear down. Linux 7.2's C106 firmware may separately flood `missed beacons` warnings even while data flows. | EHT disabled (`disable_11be=Y`) → fast **Wi-Fi 6 / HE** fallback; status reports firmware and warning count without hiding logs or forcing a firmware downgrade. | [`wifi-fix`](wifi-fix/) |
 | **Samsung Display Corp** eDP panel + Intel **`xe`** driver (Xe3 Panther Lake iGPU) | **Linux 7.2's Panel Replay default misbehaves on this panel:** PSR idle timeouts with on-screen corruption, flicker, VRR smearing, stale frames, and HDR washed out after every HDR modeset. Brightness can also change in sysfs without changing panel luminance. | Self-refresh pinned to PSR1: owners report no flicker, stale frames or VRR smearing, and HDR stays vivid across toggles; forced VESA DPCD backlight makes KDE/sysfs brightness work. | [`display-fix`](display-fix/) |
@@ -155,7 +155,7 @@ typing single letters. Numbered table, color-coded state, cached.
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
   7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
-  9   mute-led-fix              1.1.0      1.1.0      up to date     F1/F4 mute indicator LEDs
+  9   mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
   10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
   11  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
   12  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
@@ -442,7 +442,8 @@ Version 1.5 installs on more than Limine
 ([#24](https://github.com/burakgon/asus-expertbook-linux/pull/24)). On
 kernelstub (Pop!_OS) the parameters go through `kernelstub -a`; on GRUB they
 are appended to `GRUB_CMDLINE_LINUX_DEFAULT` in `/etc/default/grub` and the
-config is regenerated. Uninstall takes the same three parameters off again.
+config is regenerated. Uninstall takes the same three parameters off again
+and rebuilds the initramfs, which may carry a copy of the modprobe.d file.
 systemd-boot and other loaders are not handled: install stops and names the
 three parameters to add by hand, and the modprobe.d half still applies.
 

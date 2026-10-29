@@ -154,6 +154,7 @@ _df_apply() {
       # bootloader update. Uninstall carries on: there is nothing to take off.
       [[ $action == add ]] &&
         die "[display-fix] no supported bootloader (Limine, kernelstub or GRUB); add to the kernel cmdline by hand: ${DISPLAY_FIX_PARAMS[*]}"
+      _df_refresh_initramfs
       warn "[display-fix] no supported bootloader; if you added them by hand, remove: ${DISPLAY_FIX_PARAMS[*]}"
       ;;
     *)
@@ -161,11 +162,21 @@ _df_apply() {
         cmdline_add "${DISPLAY_FIX_PARAMS[@]}" ||
           die "[display-fix] kernel parameters were staged but the bootloader could not be updated"
       else
+        _df_refresh_initramfs
         cmdline_remove "${DISPLAY_FIX_PARAMS[@]}" ||
           die "[display-fix] kernel parameters were removed but the bootloader could not be updated"
       fi
       ;;
   esac
+}
+
+# On uninstall, rebuild the initramfs without xe-dpcd-backlight.conf.
+# initramfs-tools and mkinitcpio's modconf hook both copy /etc/modprobe.d into
+# the image, so a copy made since install would keep the xe options at the
+# next boot. Limine's regeneration rebuilds the images itself. This runs
+# before the bootloader update so kernelstub copies the new image to the ESP.
+_df_refresh_initramfs() {
+  initramfs_regen "without display-fix's xe options"
 }
 
 module_post_install() {
