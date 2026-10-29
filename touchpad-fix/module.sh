@@ -80,7 +80,7 @@ _tp_markers_ok() {
 _tp_validate() {
   local dir rc=0
   libinput quirks --help >/dev/null 2>&1 ||
-    die "[touchpad-fix] 'libinput quirks' is needed to check $TP_QUIRKS before replacing it (Arch: libinput; Debian/Ubuntu: libinput-tools)"
+    die "[touchpad-fix] 'libinput quirks' is needed to check $TP_QUIRKS before replacing it (install the libinput-tools package; on older Arch it is part of libinput)"
   dir="$(mktemp -d)" || return 1
   if ! cp -- "$1" "$dir/local-overrides.quirks" ||
      ! libinput quirks validate --data-dir "$dir"; then

@@ -29,7 +29,7 @@ other section; uninstall removes only the block. The rewritten file must pass
 `libinput quirks validate` before it replaces the old one, which is kept as
 `local-overrides.quirks.asus-expertbook-linux.bak`; a broken file would make
 libinput drop every quirk on the machine, so the `libinput quirks` tool
-(part of `libinput` on Arch, `libinput-tools` on Debian/Ubuntu) is required. If
+(package `libinput-tools`; on older Arch builds it ships in `libinput` itself) is required. If
 the begin/end markers do not pair up (edited by hand), install and uninstall
 stop without touching the file. A lock keeps two runs from overwriting each
 other's edit.
