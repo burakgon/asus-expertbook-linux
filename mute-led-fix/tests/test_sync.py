@@ -62,6 +62,21 @@ class SyncTests(unittest.TestCase):
                 sync.sync()
             update.assert_not_called()
 
+    def test_speaker_failure_does_not_hold_back_the_microphone(self):
+        def answer(*args):
+            if args == ("pactl", "get-default-sink"):
+                raise subprocess.TimeoutExpired("pactl", 3)
+            return {("pactl", "get-source-mute", "@DEFAULT_SOURCE@"): "Mute: yes"}[args]
+
+        with patch.object(sync.shutil, "which", return_value=None), \
+             patch.object(sync, "run", side_effect=answer), \
+             patch.object(sync, "update") as update:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                sync.sync()
+        self.assertEqual(update.call_args_list, [
+            unittest.mock.call("platform::micmute", True),
+        ])
+
     def test_auto_skips_a_kernel_trigger_and_still_syncs_the_other_led(self):
         sync.os.environ["MUTE_LED_SPEAKER"] = "auto"
         sync.os.environ["MUTE_LED_MIC"] = "auto"

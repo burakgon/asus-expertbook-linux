@@ -69,14 +69,30 @@ def update(device, muted):
         run("brightnessctl", "--device=" + device, "set", str(int(muted)))
 
 
-def sync():
+def sync_speaker():
     if led_enabled(SPEAKER):
         sink = (run("omarchy-audio-output-sink") if shutil.which("omarchy-audio-output-sink")
                 else run("pactl", "get-default-sink"))
         if sink:
             update(SPEAKER, run("pactl", "get-sink-mute", sink) == "Mute: yes")
+
+
+def sync_mic():
     if led_enabled(MIC):
         update(MIC, run("pactl", "get-source-mute", "@DEFAULT_SOURCE@") == "Mute: yes")
+
+
+def sync():
+    """Reconcile both LEDs. A failure on one does not hold back the other;
+    the first failure is raised once both have been tried."""
+    failure = None
+    for step in (sync_speaker, sync_mic):
+        try:
+            step()
+        except (OSError, subprocess.SubprocessError, ValueError) as error:
+            failure = failure or error
+    if failure is not None:
+        raise failure
 
 
 if __name__ == "__main__":
