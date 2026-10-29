@@ -137,7 +137,7 @@ module_install
         self.assertIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
         self.assertIn("publish-config", result.stdout)
 
-    def test_old_version_gives_way_only_once_0_2_is_built(self):
+    def test_old_version_gives_way_only_once_0_3_is_built(self):
         result = self.install(installed=(("0.1", "7.2.3-arch1-3"),))
         self.assertEqual(result.returncode, 0, result.stderr)
         steps = ["dkms-add-0.3", "dkms-build-0.3-7.2.3-arch1-3",
