@@ -4,7 +4,7 @@ Third-party files redistributed in this repository
 Kernel module licensing exception
 --------------------------------
 
-mute-led-fix/dkms/b9406-mute-led-0.2/b9406_mute_led.c is provided under
+mute-led-fix/dkms/b9406-mute-led-0.3/b9406_mute_led.c is provided under
 GPL-2.0-only, as identified by its SPDX header, rather than the repository's
 MIT license. See mute-led-fix/COPYING.GPL-2.0. The accompanying userspace
 code and packaging are covered by the repository's MIT license.

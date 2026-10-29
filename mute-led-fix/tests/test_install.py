@@ -61,7 +61,7 @@ dkms() {
       [[ $FAIL_BUILD == 1 ]] && return 42
       echo "$version $k built" >> "$STATE" ;;
     install)
-      [[ $FAIL_INSTALL == 1 && $version == 0.2 ]] && return 43
+      [[ $FAIL_INSTALL == 1 && $version == 0.3 ]] && return 43
       grep -v "^$version $k " "$STATE" > "$STATE.new" || true
       echo "$version $k installed" >> "$STATE.new"
       mv "$STATE.new" "$STATE" ;;
@@ -97,9 +97,9 @@ module_install
             for version, release in installed:
                 state += [f"{version} - registered", f"{version} {release} installed"]
             (root / "dkms.state").write_text("".join(line + "\n" for line in state))
-            bundle = root / "fixture/dkms/b9406-mute-led-0.2"
+            bundle = root / "fixture/dkms/b9406-mute-led-0.3"
             bundle.mkdir(parents=True)
-            (bundle / "dkms.conf").write_text("PACKAGE_VERSION=0.2\n")
+            (bundle / "dkms.conf").write_text("PACKAGE_VERSION=0.3\n")
             (bundle / "Makefile").write_text("obj-m += b9406_mute_led.o\n")
             (bundle / "b9406_mute_led.c").write_text("/* fixture */\n")
             for release in (kernel, *others):
@@ -130,21 +130,36 @@ module_install
         self.assertNotIn("publish-config", result.stdout)
 
     def test_reinstall_does_not_overwrite_registered_source(self):
-        result = self.install(registered="0.2")
+        result = self.install(registered="0.3")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("write-source", result.stdout)
-        self.assertNotIn("dkms-add-0.2", result.stdout)
-        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertNotIn("dkms-add-0.3", result.stdout)
+        self.assertIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
         self.assertIn("publish-config", result.stdout)
 
     def test_old_version_gives_way_only_once_0_2_is_built(self):
         result = self.install(installed=(("0.1", "7.2.3-arch1-3"),))
         self.assertEqual(result.returncode, 0, result.stderr)
-        steps = ["dkms-add-0.2", "dkms-build-0.2-7.2.3-arch1-3",
-                 "dkms-uninstall-0.1-7.2.3-arch1-3", "dkms-install-0.2-7.2.3-arch1-3",
+        steps = ["dkms-add-0.3", "dkms-build-0.3-7.2.3-arch1-3",
+                 "dkms-uninstall-0.1-7.2.3-arch1-3", "dkms-install-0.3-7.2.3-arch1-3",
                  "dkms-remove-0.1"]
         positions = [result.stdout.index(step) for step in steps]
         self.assertEqual(positions, sorted(positions), result.stdout)
+
+    def test_0_2_from_the_pull_request_gives_way_to_0_3(self):
+        result = self.install(installed=(("0.2", "7.2.3-arch1-3"),))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        steps = ["dkms-build-0.3-7.2.3-arch1-3", "dkms-uninstall-0.2-7.2.3-arch1-3",
+                 "dkms-install-0.3-7.2.3-arch1-3", "dkms-remove-0.2"]
+        positions = [result.stdout.index(step) for step in steps]
+        self.assertEqual(positions, sorted(positions), result.stdout)
+
+    def test_kernels_before_6_19_are_not_bridged(self):
+        result = self.install(others=("6.18.59-1-lts", "6.12.114-1-lts"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("6.18.59-1-lts", result.stdout)
+        self.assertNotIn("6.12.114-1-lts", result.stdout)
+        self.assertIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
 
     def test_failed_build_leaves_the_old_version_alone(self):
         result = self.install(installed=(("0.1", "7.2.3-arch1-3"),), fail_build=True)
@@ -155,7 +170,7 @@ module_install
     def test_failed_install_puts_the_old_version_back(self):
         result = self.install(installed=(("0.1", "7.2.3-arch1-3"),), fail_install=True)
         self.assertEqual(result.returncode, 43, result.stderr)
-        steps = ["dkms-uninstall-0.1-7.2.3-arch1-3", "dkms-install-0.2-7.2.3-arch1-3",
+        steps = ["dkms-uninstall-0.1-7.2.3-arch1-3", "dkms-install-0.3-7.2.3-arch1-3",
                  "dkms-install-0.1-7.2.3-arch1-3"]
         positions = [result.stdout.index(step) for step in steps]
         self.assertEqual(positions, sorted(positions), result.stdout)
@@ -178,7 +193,7 @@ module_install
         self.assertIn("dkms-remove-0.1", result.stdout)
 
     def test_registered_source_mismatch_is_not_overwritten(self):
-        result = self.install(registered="0.2", diff_ok=False)
+        result = self.install(registered="0.3", diff_ok=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("write-source", result.stdout)
         self.assertNotIn("publish-config", result.stdout)
@@ -187,7 +202,7 @@ module_install
     def test_native_led_still_installs_the_synchronizer(self):
         result = self.install(native=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("dkms-add-0.2", result.stdout)
+        self.assertNotIn("dkms-add-0.3", result.stdout)
         self.assertNotIn("load-driver", result.stdout)
         self.assertIn("publish-config", result.stdout)
         self.assertIn("provided by the kernel", result.load_text)
@@ -195,7 +210,7 @@ module_install
     def test_kernel_7_4_skips_the_bridge_and_keeps_the_synchronizer(self):
         result = self.install(kernel="7.4.1-arch1-1")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("dkms-add-0.2", result.stdout)
+        self.assertNotIn("dkms-add-0.3", result.stdout)
         self.assertIn("publish-config", result.stdout)
         self.assertIn("provided by the kernel", result.load_text)
 
@@ -203,10 +218,10 @@ module_install
         result = self.install(others=("7.3.0-2-cachyos-bore-lto", "7.4.1-arch1-1"),
                               headerless=("7.2.11-arch1-1",))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
-        self.assertIn("dkms-install-0.2-7.3.0-2-cachyos-bore-lto", result.stdout)
+        self.assertIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
+        self.assertIn("dkms-install-0.3-7.3.0-2-cachyos-bore-lto", result.stdout)
         self.assertNotIn("7.4.1-arch1-1", result.stdout)
-        self.assertNotIn("dkms-install-0.2-7.2.11-arch1-1", result.stdout)
+        self.assertNotIn("dkms-install-0.3-7.2.11-arch1-1", result.stdout)
         self.assertIn("skipping 7.2.11-arch1-1", result.stderr)
         self.assertEqual(result.stdout.count("load-driver"), 1)
 
@@ -217,11 +232,11 @@ module_install
 
     def test_running_7_4_keeps_the_bridge_for_older_installed_kernels(self):
         result = self.install(kernel="7.4.1-arch1-1", others=("7.3.0-2-cachyos-bore-lto",),
-                              registered="0.2")
+                              registered="0.3")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("dkms-remove-0.2", result.stdout)
-        self.assertIn("dkms-install-0.2-7.3.0-2-cachyos-bore-lto", result.stdout)
-        self.assertNotIn("dkms-install-0.2-7.4.1-arch1-1", result.stdout)
+        self.assertNotIn("dkms-remove-0.3", result.stdout)
+        self.assertIn("dkms-install-0.3-7.3.0-2-cachyos-bore-lto", result.stdout)
+        self.assertNotIn("dkms-install-0.3-7.4.1-arch1-1", result.stdout)
         self.assertNotIn("load-driver", result.stdout)
         self.assertIn("publish-config", result.stdout)
         self.assertNotIn("provided by the kernel", result.load_text)
@@ -229,7 +244,7 @@ module_install
     def test_missing_sync_tools_only_warn(self):
         result = self.install(missing=("pactl", "brightnessctl"))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
         self.assertIn("load-driver", result.stdout)
         self.assertIn("missing pactl", result.stderr)
         self.assertIn("missing brightnessctl", result.stderr)
@@ -242,8 +257,8 @@ module_install
     def test_native_led_on_the_running_kernel_still_bridges_older_kernels(self):
         result = self.install(native=True, others=("7.2.11-arch1-1",))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("dkms-install-0.2-7.2.11-arch1-1", result.stdout)
-        self.assertNotIn("dkms-install-0.2-7.2.3-arch1-3", result.stdout)
+        self.assertIn("dkms-install-0.3-7.2.11-arch1-1", result.stdout)
+        self.assertNotIn("dkms-install-0.3-7.2.3-arch1-3", result.stdout)
         self.assertNotIn("load-driver", result.stdout)
         self.assertNotIn("provided by the kernel", result.load_text)
 

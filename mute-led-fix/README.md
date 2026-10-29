@@ -62,26 +62,30 @@ For Arch's standard `linux` kernel, the additional packages are usually:
 sudo pacman -S --needed dkms base-devel linux-headers python libpulse brightnessctl
 ```
 
-Use your kernel's matching header package instead of `linux-headers` for LTS,
-Zen or CachyOS, and the matching LLVM toolchain for a Clang-built kernel.
-Built on 7.2.3-arch1-3, 7.2.11-arch1-1 and CachyOS 7.3.0, and loaded on 7.2.3
-and 7.3.0. Not built on 7.4 or newer. DKMS's normal kernel build settings apply; compiler
-overrides can be supplied through DKMS config.
+Use your kernel's matching header package instead of `linux-headers` for Zen
+or CachyOS, and the matching LLVM toolchain for a Clang-built kernel. Built on
+7.2.3-arch1-3, 7.2.11-arch1-1 and CachyOS 7.3.0, and loaded on 7.2.3 and 7.3.0.
+Only 6.19 to 7.3 get the bridge: 7.4 has the LED itself, and before 6.19
+`asus-wmi` does not export the calls the driver uses (this laptop has no sound
+card there either, so there is nothing for the LED to follow). DKMS's normal
+kernel build settings apply; compiler overrides can be supplied through DKMS
+config.
 
 ```sh
 ./patch.sh install mute-led-fix
 ```
 
 No reboot required on a kernel that still needs the bridge. The installer
-builds the bridge for every installed kernel older than 7.4, not only the
+builds the bridge for every installed kernel from 6.19 to 7.3, not only the
 running one, so booting another kernel keeps F1. A kernel without matching
 headers is skipped with a warning; a failed build stops the install. The
 driver is loaded at once when the running kernel is one of those built. A
 running kernel that already has `platform::mute` from another driver is left
-alone. A registered 0.2 tree that differs from this checkout is not
-overwritten. DKMS version 0.1, from the first revision of this module, gives
-way kernel by kernel: it comes off a kernel only once 0.2 is built for it,
-goes back if 0.2 fails to install, and is removed once no kernel runs it.
+alone. A registered 0.3 tree that differs from this checkout is not
+overwritten. Earlier DKMS versions (0.1 and 0.2, from the pull requests that
+built this module) give way kernel by kernel: each comes off a kernel only
+once 0.3 is built for it, goes back if 0.3 fails to install, and is removed
+once no kernel runs it.
 
 The session service is not enabled by the installer. As your desktop user:
 
@@ -165,12 +169,12 @@ with a running session, and removes that user's enablement links under both
 `graphical-session.target.wants` and `default.target.wants`. If a user is not
 logged in, the patcher prints the `systemctl --user disable --now` command
 instead of claiming the service was stopped. The loaded LED driver remains
-until the next reboot. DKMS 0.1 and 0.2 and their source trees are removed.
+until the next reboot. DKMS 0.1 to 0.3 and their source trees are removed.
 The stock microphone driver stays intact.
 
 ## Upstream path
 
-This is a bridge for kernels before 7.4. Upstream has queued `platform::mute`
+This is a bridge for kernels 6.19 to 7.3. Upstream has queued `platform::mute`
 with an `audio-mute` default trigger for 7.4, so the DKMS module is not built
 there. If the running kernel already has a `platform::mute` this module did
 not create, install does not load the DKMS driver, still builds it for older

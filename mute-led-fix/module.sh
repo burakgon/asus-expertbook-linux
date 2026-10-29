@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 MODULE_NAME="mute-led-fix"
 MODULE_DESC="F1 speaker and F4 microphone mute indicator LEDs"
-MODULE_VERSION="1.1.0"
+MODULE_VERSION="1.2.0"
 
 MODULE_FILES=(
   "b9406-mute-led.conf:/etc/modules-load.d/b9406-mute-led.conf"
@@ -10,15 +10,19 @@ MODULE_FILES=(
 )
 
 MUTE_DKMS_NAME=b9406-mute-led
-MUTE_DKMS_VERSION=0.2
-MUTE_DKMS_OLD_VERSION=0.1
+MUTE_DKMS_VERSION=0.3
+# Earlier revisions of this module, oldest first: 0.1 had no kernel range,
+# 0.2 accepted every 6.x kernel.
+MUTE_DKMS_OLD_VERSIONS=(0.1 0.2)
 MUTE_DKMS_ROOT=${MUTE_DKMS_ROOT:-/usr/src}
-MUTE_DKMS_SOURCE=$MUTE_DKMS_ROOT/b9406-mute-led-0.2
+MUTE_DKMS_SOURCE=$MUTE_DKMS_ROOT/b9406-mute-led-$MUTE_DKMS_VERSION
 
-# 7.4+ registers platform::mute itself. Matches BUILD_EXCLUSIVE_KERNEL.
+# 7.4+ registers platform::mute itself. Before 6.19 asus-wmi does not export
+# the devstate calls the bridge uses, and this laptop has no sound card for
+# the LED to follow. Matches BUILD_EXCLUSIVE_KERNEL.
 mute_kernel_needs_bridge() {
   local rel="${1:-$(uname -r)}"
-  [[ $rel =~ ^(6\.|7\.[0-3]\.) ]]
+  [[ $rel =~ ^(6\.19|7\.[0-3])\. ]]
 }
 
 mute_dkms_registered() {
@@ -76,40 +80,45 @@ mute_remove_version() {
   rm -rf -- "$source"
 }
 
-# 0.1, from the first revision of this module, stays only on a kernel that
-# still needs the bridge and has no 0.2 yet. It is taken off every other
-# kernel and removed once no kernel runs it.
-mute_retire_old_version() {
-  local k
-  local -a keep=()
-  while IFS= read -r k; do
-    [[ $(mute_dkms_state "$MUTE_DKMS_OLD_VERSION" "$k") == installed ]] || continue
-    if [[ " $* " == *" $k "* &&
-          $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") != installed ]]; then
-      keep+=("$k")
+# An earlier version stays only on a kernel that still needs the bridge and
+# has no current build yet. It is taken off every other kernel and removed
+# once no kernel runs it.
+mute_retire_old_versions() {
+  local k old
+  local -a keep
+  for old in "${MUTE_DKMS_OLD_VERSIONS[@]}"; do
+    keep=()
+    while IFS= read -r k; do
+      [[ $(mute_dkms_state "$old" "$k") == installed ]] || continue
+      if [[ " $* " == *" $k "* &&
+            $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") != installed ]]; then
+        keep+=("$k")
+        continue
+      fi
+      dkms uninstall -m "$MUTE_DKMS_NAME" -v "$old" -k "$k"
+    done < <(kernel_list)
+    if (( ${#keep[@]} > 0 )); then
+      warn "[mute-led-fix] kept $MUTE_DKMS_NAME $old on ${keep[*]}: $MUTE_DKMS_VERSION is not built there yet"
       continue
     fi
-    dkms uninstall -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"
-  done < <(kernel_list)
-  if (( ${#keep[@]} > 0 )); then
-    warn "[mute-led-fix] kept $MUTE_DKMS_NAME $MUTE_DKMS_OLD_VERSION on ${keep[*]}: 0.2 is not built there yet"
-    return 0
-  fi
-  mute_remove_version "$MUTE_DKMS_OLD_VERSION"
+    mute_remove_version "$old"
+  done
 }
 
-# A registered 0.2 whose tree differs from this checkout is left alone.
+# A registered version whose tree differs from this checkout is left alone.
 # Rebuilding it in place would replace a module root already compiled.
 mute_ensure_dkms() {
   local bundle="$MODULE_DIR/dkms/b9406-mute-led-$MUTE_DKMS_VERSION" running k rc old
-  local -a kernels=() built=()
+  local -a kernels=() built=() taken=()
   running=$(uname -r)
 
   mapfile -t kernels < <(mute_bridge_kernels)
   if (( ${#kernels[@]} == 0 )); then
     mute_remove_version "$MUTE_DKMS_VERSION"
-    mute_remove_version "$MUTE_DKMS_OLD_VERSION"
-    log "[mute-led-fix] every installed kernel has platform::mute; DKMS bridge not installed"
+    for old in "${MUTE_DKMS_OLD_VERSIONS[@]}"; do
+      mute_remove_version "$old"
+    done
+    log "[mute-led-fix] no installed kernel needs the bridge (7.4+ has platform::mute, before 6.19 there is no card); DKMS bridge not installed"
     return 0
   fi
 
@@ -143,27 +152,29 @@ mute_ensure_dkms() {
     built+=("$k")
   done
 
-  # Swap kernel by kernel: 0.1 comes off a kernel only once 0.2 is built for
-  # it, and goes back if 0.2 does not install.
+  # Swap kernel by kernel: an earlier version comes off a kernel only once the
+  # current one is built for it, and goes back if the current one does not
+  # install.
   for k in "${built[@]}"; do
     [[ $(mute_dkms_state "$MUTE_DKMS_VERSION" "$k") == installed ]] && continue
-    old=0
-    if [[ $(mute_dkms_state "$MUTE_DKMS_OLD_VERSION" "$k") == installed ]]; then
-      dkms uninstall -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"
-      old=1
-    fi
+    taken=()
+    for old in "${MUTE_DKMS_OLD_VERSIONS[@]}"; do
+      [[ $(mute_dkms_state "$old" "$k") == installed ]] || continue
+      dkms uninstall -m "$MUTE_DKMS_NAME" -v "$old" -k "$k"
+      taken+=("$old")
+    done
     rc=0
     dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_VERSION" -k "$k" || rc=$?
     if (( rc != 0 )); then
-      if (( old )) &&
-         ! dkms install -m "$MUTE_DKMS_NAME" -v "$MUTE_DKMS_OLD_VERSION" -k "$k"; then
-        warn "[mute-led-fix] could not put $MUTE_DKMS_OLD_VERSION back on $k"
-      fi
+      for old in "${taken[@]}"; do
+        dkms install -m "$MUTE_DKMS_NAME" -v "$old" -k "$k" ||
+          warn "[mute-led-fix] could not put $old back on $k"
+      done
       return "$rc"
     fi
   done
 
-  mute_retire_old_version "${kernels[@]}"
+  mute_retire_old_versions "${kernels[@]}"
 
   [[ " ${built[*]} " == *" $running "* ]] || return 0
   modprobe b9406_mute_led
@@ -260,8 +271,11 @@ module_install() {
 }
 
 module_post_uninstall() {
+  local old
   mute_stop_user_sync
-  mute_remove_version "$MUTE_DKMS_OLD_VERSION"
+  for old in "${MUTE_DKMS_OLD_VERSIONS[@]}"; do
+    mute_remove_version "$old"
+  done
   mute_remove_version "$MUTE_DKMS_VERSION"
   echo "  The loaded LED driver, if any, remains until the next reboot."
 }
