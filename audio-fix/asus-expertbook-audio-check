@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# asus-expertbook-linux audio-fix: pacman PostTransaction check (#25).
+#
+# A kernel update runs the DKMS hook, and a failed overlay build only leaves a
+# line in its output: the next boot has no sound card, and PipeWire shows
+# Dummy Output. This check runs after the DKMS hook and names every installed
+# kernel that needs the overlay but has no installed build of it.
+#
+# Read-only: it never builds or removes anything, always exits 0, and prints
+# nothing when every kernel is fine. audio-fix's module.sh sources this file
+# for the per-kernel rules below, so install and the check cannot disagree.
+#
+# Usage: asus-expertbook-audio-check <dkms-name>/<dkms-version>
+
+# audio_kernel_has_upstream_ghost_quirk [kernel-release]
+#
+# Do not rely on a kernel version: distributions may backport the fix. The
+# accepted SoundWire DMI entry embeds the exact board name in the module that
+# links drivers/soundwire/dmi-quirks.o -- soundwire_intel, not soundwire_bus --
+# so inspecting it is both backport-safe and independent of the running
+# kernel. Commit: 90af3209742db61a7f9d7d054a16165818cfc6d8 (Linux 7.3-rc1).
+audio_kernel_has_upstream_ghost_quirk() {
+  local kernel="${1:-$(uname -r)}" module marker=""
+  module="$(modinfo -k "$kernel" -n soundwire_intel 2>/dev/null || true)"
+  [[ -f $module ]] || return 1
+
+  case "$module" in
+    *.zst) marker="$(zstdcat -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
+    *.xz)  marker="$(xzcat -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
+    *.gz)  marker="$(gzip -cd -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
+    *)     marker="$(strings -- "$module" 2>/dev/null | grep -F 'B9406CAA' || true)" ;;
+  esac
+  [[ -n $marker ]]
+}
+
+# audio_kernel_fixed_upstream [kernel-release]
+#
+# The kernel's own sof_sdw brings the card up: it has the upstream ghost-RT722
+# quirk, and it is not 7.2.11, whose half-backported OT25 series needs the
+# overlay even where a distribution also backported the quirk.
+audio_kernel_fixed_upstream() {
+  local kernel="${1:-$(uname -r)}"
+  [[ ! $kernel =~ ^7\.2\.11([^0-9]|$) ]] &&
+    audio_kernel_has_upstream_ghost_quirk "$kernel"
+}
+
+# audio_kernel_predates_card [kernel-release]
+#
+# Before Linux 6.19 no machine driver matches this laptop's codecs
+# (ptl_cs42l43_agg_l3_cs35l56_l2), so no card comes up there with or without
+# the overlay. Matches the overlay's BUILD_EXCLUSIVE_KERNEL lower bound.
+audio_kernel_predates_card() {
+  local kernel="${1:-$(uname -r)}"
+  [[ $kernel =~ ^([0-5]\.|6\.([0-9]|1[0-8])\.) ]]
+}
+
+audio_check_main() {
+  local overlay="${1:-}" name version kernel dir status
+  local root="${AUDIO_CHECK_MODULES_ROOT:-/usr/lib/modules}"
+  local -a missing=()
+
+  name="${overlay%/*}"
+  version="${overlay#*/}"
+  [[ -n $name && -n $version && $name != "$overlay" ]] || return 0
+
+  # Only kernels that are still installed: a removed kernel can leave its
+  # modules directory behind with nothing but updates/dkms in it.
+  for dir in "$root"/*/; do
+    kernel="${dir%/}"
+    kernel="${kernel##*/}"
+    [[ -f $dir/vmlinuz ]] || continue
+    audio_kernel_predates_card "$kernel" && continue
+    audio_kernel_fixed_upstream "$kernel" && continue
+
+    status="$(dkms status -m "$name" -v "$version" -k "$kernel" 2>/dev/null || true)"
+    [[ $status == *": installed"* ]] || missing+=("$kernel")
+  done
+  (( ${#missing[@]} )) || return 0
+
+  echo "==> WARNING: asus-expertbook-linux audio-fix: the next boot of these kernels has no sound card:"
+  for kernel in "${missing[@]}"; do
+    echo "      $kernel"
+  done
+  echo "    They need the $name $version DKMS overlay, but DKMS has not installed it."
+  echo "    The DKMS output above gives the reason; the build log is in"
+  echo "    /var/lib/dkms/$name/$version/build/make.log. Most often the kernel's"
+  echo "    headers are missing or the overlay does not build on it yet."
+  echo "    After installing the headers, run ./patch.sh install audio-fix again."
+  echo "    Details: dkms status $name"
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  audio_check_main "$@"
+  exit 0
+fi

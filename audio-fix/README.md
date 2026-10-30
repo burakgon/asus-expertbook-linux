@@ -68,6 +68,7 @@ overlay only where needed, and removes it once every kernel contains the quirk.
 | `cs35l56-…-l2u1.bin` / `.wmfw` | `/lib/firmware/cirrus/` | Same, right amp. |
 | `52-disable-bt-sco-offload.conf` | `/etc/wireplumber/wireplumber.conf.d/` | Disables the dead `SSP2-BT` offload PCM so its probe stops spamming the log (pre-7.1 kernels; inert on 7.1+). A2DP/HFP Bluetooth still works via the PipeWire software path. |
 | `dkms/asus-expertbook-sof-sdw-3.0.3/` | `/usr/src/asus-expertbook-sof-sdw-3.0.3/` + `/lib/modules/*/updates/dkms/` | Board-scoped compatibility filter, built only for 6.19–7.2 kernels lacking upstream commit `90af3209742d` (never by DKMS for 7.3+ or before 6.19); on 7.2.11 it also restores the CS35L56 feedback DAI. Install also regenerates initramfs images. |
+| `asus-expertbook-audio-check` + `.hook` | `/usr/local/lib/` + `/etc/pacman.d/hooks/90-asus-expertbook-audio-check.hook` | pacman only: after a kernel install or upgrade, warns about any kernel left without the overlay it needs. Read-only. |
 
 ### Installed only on `alsa-ucm-conf < 1.2.16` (otherwise the package provides them)
 
@@ -148,7 +149,15 @@ If audio disappears right after a kernel update, check whether DKMS actually
 rebuilt the overlay: `dkms status asus-expertbook-sof-sdw` must say
 `installed` for the running kernel. `added` means the build failed and the
 stock driver is back; the reason is in
-`/var/lib/dkms/asus-expertbook-sof-sdw/*/build/make.log`. This is what broke
+`/var/lib/dkms/asus-expertbook-sof-sdw/*/build/make.log`. On pacman systems
+`audio-fix` 3.4.0 checks this itself
+([#25](https://github.com/burakgon/asus-expertbook-linux/issues/25)): a
+`PostTransaction` hook that sorts after the DKMS hooks runs whenever a kernel
+is installed or upgraded, applies the same per-kernel rules as install
+(upstream quirk, 7.2.11, before 6.19), and prints a warning naming every
+kernel that needs the overlay but has no installed build. It never builds or
+removes anything, always succeeds, and prints nothing when all kernels are
+fine. This is what broke
 overlay 3.0.0 on Linux 7.2.8, whose stable update backported the 7.3
 `asoc_sdw_parse_sdw_endpoints(dev, ctx, ...)` signature; 3.0.1 detects that
 signature from the kernel headers. 3.0.2 adds a kernel range

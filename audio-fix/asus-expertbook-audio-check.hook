@@ -1,0 +1,13 @@
+# Installed by asus-expertbook-linux (audio-fix). Warns when a kernel that
+# needs the sof_sdw DKMS overlay is left without it. The name sorts after the
+# 70-dkms-* hooks, so this runs once DKMS has built (or failed to build).
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Description = Checking the asus-expertbook-linux audio DKMS overlay...
+When = PostTransaction
+Exec = /usr/local/lib/asus-expertbook-audio-check @AUDIO_DKMS@
