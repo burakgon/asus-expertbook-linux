@@ -65,13 +65,17 @@
 
 MODULE_NAME="audio-fix"
 MODULE_DESC="B9406CAA audio: adaptive ghost-RT722 fix + HiFi UCM + cs35l56 firmware"
-MODULE_VERSION="3.3.0"
+MODULE_VERSION="3.4.0"
 
 AUDIO_DKMS_NAME="asus-expertbook-sof-sdw"
 AUDIO_DKMS_VERSION="3.0.3"
 AUDIO_DKMS_SOURCE="$MODULE_DIR/dkms/${AUDIO_DKMS_NAME}-${AUDIO_DKMS_VERSION}"
 AUDIO_DKMS_SRCDIR="/usr/src"
 AUDIO_DKMS_TARGET="$AUDIO_DKMS_SRCDIR/${AUDIO_DKMS_NAME}-${AUDIO_DKMS_VERSION}"
+
+# pacman hook that warns when a kernel update leaves the overlay unbuilt (#25).
+AUDIO_CHECK="/usr/local/lib/asus-expertbook-audio-check"
+AUDIO_CHECK_HOOK="/etc/pacman.d/hooks/90-asus-expertbook-audio-check.hook"
 
 # Always-installed payload: the SSP2-BT topology-noise silencer. The OEM
 # firmware and the HiFi UCM files are handled conditionally in
@@ -231,47 +235,11 @@ ucm_hifi_is_upstream() {
   pkg_atleast alsa-ucm-conf 1.2.16
 }
 
-# audio_kernel_has_upstream_ghost_quirk [kernel-release]
-#
-# Do not rely on a kernel version: distributions may backport the fix. The
-# accepted SoundWire DMI entry embeds the exact board name in the module that
-# links drivers/soundwire/dmi-quirks.o -- soundwire_intel, not soundwire_bus --
-# so inspecting it is both backport-safe and independent of the running
-# kernel. Commit: 90af3209742db61a7f9d7d054a16165818cfc6d8 (Linux 7.3-rc1).
-audio_kernel_has_upstream_ghost_quirk() {
-  local kernel="${1:-$(uname -r)}" module marker=""
-  module="$(modinfo -k "$kernel" -n soundwire_intel 2>/dev/null || true)"
-  [[ -f $module ]] || return 1
-
-  case "$module" in
-    *.zst) marker="$(zstdcat -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
-    *.xz)  marker="$(xzcat -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
-    *.gz)  marker="$(gzip -cd -- "$module" 2>/dev/null | strings | grep -F 'B9406CAA' || true)" ;;
-    *)     marker="$(strings -- "$module" 2>/dev/null | grep -F 'B9406CAA' || true)" ;;
-  esac
-  [[ -n $marker ]]
-}
-
-# audio_kernel_fixed_upstream [kernel-release]
-#
-# The kernel's own sof_sdw brings the card up: it has the upstream ghost-RT722
-# quirk, and it is not 7.2.11, whose half-backported OT25 series needs the
-# overlay even where a distribution also backported the quirk.
-audio_kernel_fixed_upstream() {
-  local kernel="${1:-$(uname -r)}"
-  [[ ! $kernel =~ ^7\.2\.11([^0-9]|$) ]] &&
-    audio_kernel_has_upstream_ghost_quirk "$kernel"
-}
-
-# audio_kernel_predates_card [kernel-release]
-#
-# Before Linux 6.19 no machine driver matches this laptop's codecs
-# (ptl_cs42l43_agg_l3_cs35l56_l2), so no card comes up there with or without
-# the overlay. Matches the overlay's BUILD_EXCLUSIVE_KERNEL lower bound.
-audio_kernel_predates_card() {
-  local kernel="${1:-$(uname -r)}"
-  [[ $kernel =~ ^([0-5]\.|6\.([0-9]|1[0-8])\.) ]]
-}
+# The per-kernel rules (audio_kernel_has_upstream_ghost_quirk,
+# audio_kernel_fixed_upstream, audio_kernel_predates_card) live in the pacman
+# check, so install and the post-update warning use the same ones.
+# shellcheck source=asus-expertbook-audio-check
+source "$MODULE_DIR/asus-expertbook-audio-check"
 
 audio_dkms_installed_for_kernel() {
   local kernel="${1:-$(uname -r)}" status=""
@@ -637,6 +605,25 @@ audio_remove_dkms() {
   audio_refresh_initramfs "after removing the DKMS overlay"
 }
 
+# The check has nothing to say where no kernel can need the overlay, but it
+# stays installed: the next kernel update may bring one that does.
+audio_install_check() {
+  [[ $(pkg_manager) == pacman ]] || return 0
+  install -D -m 0755 "$MODULE_DIR/asus-expertbook-audio-check" "$AUDIO_CHECK" ||
+    die "[audio-fix] cannot install $AUDIO_CHECK"
+  install -d -m 0755 "${AUDIO_CHECK_HOOK%/*}" ||
+    die "[audio-fix] cannot create ${AUDIO_CHECK_HOOK%/*}"
+  sed "s|@AUDIO_DKMS@|$AUDIO_DKMS_NAME/$AUDIO_DKMS_VERSION|" \
+    "$MODULE_DIR/asus-expertbook-audio-check.hook" >"$AUDIO_CHECK_HOOK" &&
+    chmod 0644 "$AUDIO_CHECK_HOOK" ||
+    die "[audio-fix] cannot install $AUDIO_CHECK_HOOK"
+  log "[audio-fix] installed the post-update overlay check -> $AUDIO_CHECK_HOOK"
+}
+
+audio_remove_check() {
+  rm -f -- "$AUDIO_CHECK_HOOK" "$AUDIO_CHECK"
+}
+
 module_post_install() {
   local fw_changed=0
   audio_require_sof_firmware
@@ -651,6 +638,7 @@ module_post_install() {
   fi
 
   audio_install_dkms
+  audio_install_check
   if (( fw_changed && ! AUDIO_INITRAMFS_REFRESHED )); then
     audio_refresh_initramfs "after the speaker firmware change"
   fi
@@ -691,6 +679,7 @@ module_post_install() {
 module_post_uninstall() {
   # Firmware first, so the initramfs rebuilt by audio_remove_dkms holds no copy.
   audio_remove_bundled_firmware || true
+  audio_remove_check
   audio_remove_dkms
 
   # Only tear down UCM files we placed ourselves. When alsa-ucm-conf >= 1.2.16
@@ -739,6 +728,15 @@ module_status_extra() {
   else
     printf '  DKMS:     %snot installed for running kernel %s%s\n' \
       "$c_warn" "$(uname -r)" "$c_off"
+  fi
+  if [[ $(pkg_manager) == pacman ]]; then
+    if [[ -f $AUDIO_CHECK_HOOK && -x $AUDIO_CHECK ]]; then
+      printf '  check:    %spacman warns when a kernel update leaves the overlay unbuilt%s\n' \
+        "$c_ok" "$c_off"
+    else
+      printf '  check:    %spost-update overlay check not installed; reinstall audio-fix%s\n' \
+        "$c_warn" "$c_off"
+    fi
   fi
   if [[ $kmsg == *"Calibration applied"* || $kmsg == *"Tuning PID:"* ]]; then
     fw_state="${c_ok}cs35l56 tuning firmware loaded${c_off}"

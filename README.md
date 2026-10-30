@@ -147,7 +147,7 @@ typing single letters. Numbered table, color-coded state, cached.
 
   #   Module                    Version    Installed  State          Description
   --------------------------------------------------------------------------------------
-  1   audio-fix                 3.3.0      3.3.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
+  1   audio-fix                 3.4.0      3.4.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
   2   camera-firmware           3009       3009       up to date     Verified camera UEFI capsule
   3   display-fix               1.5.0      1.5.0      up to date     PSR1 self-refresh + DPCD brightness
   4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
@@ -284,7 +284,10 @@ longer forces `LLVM=1` on GCC-built kernels. 3.3.0 (overlay 3.0.3) brings the
 card back on Linux 7.2.11, whose stable update took only half of the CS35L56
 OT25 series ([#28](https://github.com/burakgon/asus-expertbook-linux/issues/28)),
 and skips kernels before 6.19, such as the 6.18 LTS, with a warning instead of
-failing the install: they have no machine driver match for this laptop.
+failing the install: they have no machine driver match for this laptop. 3.4.0
+adds a read-only pacman hook that warns, right after a kernel update, about
+any kernel left without the overlay it needs
+([#25](https://github.com/burakgon/asus-expertbook-linux/issues/25)).
 
 | File | Path | What it does |
 |---|---|---|
