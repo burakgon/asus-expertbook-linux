@@ -1,0 +1,5 @@
+#!/bin/sh
+case "$1" in
+  pre)  systemctl stop fprintd.service ;;
+  post) systemctl restart fprintd.service ;;
+esac

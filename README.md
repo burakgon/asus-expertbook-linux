@@ -56,6 +56,7 @@ time via [`lib/distro.sh`](lib/distro.sh).
 | **PixArt I²C-HID** haptic touchpad `093A:4F05` (ACPI `ASCP1D80`) | **Touchpad doesn't move the cursor.** Kernel log spams `kernel bug: Touch jump detected and discarded.` libinput rejects every event. A separate `i2c_designware.0` wedge can freeze the whole desktop; see [below](#if-the-desktop-freezes). | Cursor responds to light touches like any normal laptop. Zero "Touch jump" lines. The bus wedge is a kernel stall the quirk does not prevent. | [`touchpad-fix`](touchpad-fix/) |
 | **PixArt haptic touchpad** (Windows Precision pressure pad) | **No click-force or haptic-strength setting.** MyASUS sets both on Windows; Linux has no control, and the firmware forgets them at power-off. | *(optional)* `touchpad-haptics set --click-force light --intensity 30`, saved values restored whenever the pad appears. Standard HID feature reports only, verified against the pad's descriptor. | [`touchpad-haptics`](touchpad-haptics/) |
 | **F1 / F4 mute indicator LEDs** | Audio mute works, but the orange lights do not follow it. Linux 7.2 has no `platform::mute` for this board. | A DKMS bridge registers the speaker LED with the `audio-mute` trigger on 6.19–7.3 kernels. Speaker and microphone sync can be enabled separately. | [`mute-led-fix`](mute-led-fix/) |
+| **FocalTech FT9349** fingerprint sensor (USB `2808:a97a`) | **Fingerprint stops working after suspend or hibernate.** Enroll and verify work after boot, but on resume `fprintd-verify` fails with `Open failed with error: The device has already been opened!` until `systemctl restart fprintd`. | Installs `fprintd`, plus a systemd-sleep hook that stops it before sleep and restarts it on resume; the sensor answers on the first touch. Stock libfprint driver, no driver change. | [`fingerprint-fix`](fingerprint-fix/) |
 | **Cirrus CS42L43** codec + 2× **CS35L56** speaker amps (PCI subsystem `1043:15e4`) | **Dummy Output / silent speakers.** A ghost RT722 can abort ALSA card registration; older userspace also lacks tuning/UCM. | Uses the accepted in-kernel B9406 quirk when present and DKMS only on older kernels; HiFi routing and calibrated amps work. | [`audio-fix`](audio-fix/) |
 | **Intel Wi-Fi 7 BE211** Panther Lake CNVi (`8086:e440`) | **Wi-Fi 7 (802.11be / EHT) is unstable.** EHT RX can collapse to MCS0/NSS1 and MLO sessions tear down. Linux 7.2's C106 firmware may separately flood `missed beacons` warnings even while data flows. | EHT disabled (`disable_11be=Y`) → fast **Wi-Fi 6 / HE** fallback; status reports firmware and warning count without hiding logs or forcing a firmware downgrade. | [`wifi-fix`](wifi-fix/) |
 | **Samsung Display Corp** eDP panel + Intel **`xe`** driver (Xe3 Panther Lake iGPU) | **Linux 7.2's Panel Replay default misbehaves on this panel:** PSR idle timeouts with on-screen corruption, flicker, VRR smearing, stale frames, and HDR washed out after every HDR modeset. Brightness can also change in sysfs without changing panel luminance. | Self-refresh pinned to PSR1: owners report no flicker, stale frames or VRR smearing, and HDR stays vivid across toggles; forced VESA DPCD backlight makes KDE/sysfs brightness work. | [`display-fix`](display-fix/) |
@@ -120,7 +121,7 @@ After reboot:
 ./patch.sh status
 ```
 
-You should see all fourteen modules `up to date` (or not applicable) and their runtime
+You should see all fifteen modules `up to date` (or not applicable) and their runtime
 checks green — except `keyboard-backlight-fix`, which reports `not installed`
 because it deliberately supersedes itself.
 
@@ -150,17 +151,18 @@ typing single letters. Numbered table, color-coded state, cached.
   1   audio-fix                 3.3.0      3.3.0      up to date     Adaptive ghost-RT722 fix + HiFi audio
   2   camera-firmware           3009       3009       up to date     Verified camera UEFI capsule
   3   display-fix               1.5.0      1.5.0      up to date     PSR1 self-refresh + DPCD brightness
-  4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
-  5   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
-  6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
-  7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
-  8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
-  9   mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
-  10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
-  11  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
-  12  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
-  13  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
-  14  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
+  4   fingerprint-fix           1.0.0      1.0.0      up to date     FT9349 fingerprint after suspend
+  5   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
+  6   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
+  7   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
+  8   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
+  9   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
+  10  mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
+  11  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
+  12  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
+  13  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
+  14  webcam-ai-fix             1.1.0      1.1.0      up to date     OBS CPU background blur
+  15  wifi-fix                  2.1.1      2.1.1      up to date     BE211: EHT fallback + beacon diagnostics
 
 Actions
   i <num>    install / update module (idempotent — re-runs post hooks)
@@ -842,6 +844,24 @@ lit across s2idle. See [`mute-led-fix/README.md`](mute-led-fix/README.md).
 ./patch.sh install mute-led-fix
 ```
 
+### 15. [`fingerprint-fix`](fingerprint-fix/) — fingerprint after suspend
+
+The FocalTech FT9349 (`2808:a97a`) needs no driver work: stock libfprint's
+"Focaltech MOC Sensors" driver enrolls and verifies out of the box. After a
+suspend or hibernate, though, fprintd keeps the sensor claimed, and every
+prompt fails with `Open failed with error: The device has already been opened!`
+until fprintd is restarted. The kernel log stays clean; the sensor itself
+comes back fine. The module installs `fprintd` (Arch and CachyOS leave it
+out by default) and a systemd-sleep hook,
+`/usr/lib/systemd/system-sleep/fprintd-reset`, that stops fprintd before sleep
+and restarts it on resume. Uninstall removes the hook and keeps the package.
+`status` reports the module as not applicable when no sensor is found. Details in
+[`fingerprint-fix/README.md`](fingerprint-fix/README.md).
+
+```sh
+./patch.sh install fingerprint-fix
+```
+
 ## How it works
 
 The whole project is a small bash module manager (`patch.sh`, ~500 lines)
@@ -857,6 +877,7 @@ asus-expertbook-linux/
 │   └── …                       # payload files
 ├── camera-firmware/            # verified ASUS 3009 capsule staging
 ├── display-fix/  …
+├── fingerprint-fix/  …         # systemd-sleep hook: restarts fprintd around suspend
 ├── hdr-fix/                    # libdisplay-info 0.3.0 + DisplayID 2.0 backport patches
 ├── intel-perf-fix/  …
 ├── ish-firmware/               # verified ASUS Sensor Hub image staging
@@ -937,6 +958,7 @@ back the updates after it.
   | `ish-firmware` | untested | installs files only, but needs `7z` and `curl` and checks ownership with `pacman -Qo` |
   | `touchpad-haptics` | untested | files, a python3 CLI, a udev rule and a oneshot unit; no package manager involved |
   | `power-profile-bridge` | untested | needs a power-profiles-daemon with `--block-driver` (0.30 has it) |
+  | `fingerprint-fix` | untested | one systemd-sleep hook file plus `fprintd` through `pkg_install` (same package name on apt) |
   | `hdr-fix` | not planned | refuses anything but the exact Arch/CachyOS libdisplay-info 0.3.0 packages it was built against |
   | `webcam-ai-fix`, `keyboard-backlight-fix` | not planned | depend on AUR-only packages (`obs-backgroundremoval`, `asusctl`); `keyboard-backlight-fix` is superseded by `keyboard-backlight-auto` anyway |
 
@@ -1052,6 +1074,11 @@ Yes. The FocalTech FT9349 (`2808:a97a`) is supported by upstream
 `libfprint 1.94.100` and later. Install the normal `libfprint` + `fprintd`
 packages, then enroll with `fprintd-enroll`. No out-of-tree patch is needed on
 current Arch/CachyOS.
+
+Without help it stops working after a suspend or hibernate (`The device has
+already been opened!`).
+[`fingerprint-fix`](#15-fingerprint-fix--fingerprint-after-suspend) installs
+`fprintd` and restarts it around sleep.
 
 </details>
 
