@@ -29,10 +29,11 @@
 #         acc   = alpha * reading + (1 - alpha) * acc
 #     with TIME_CONSTANT = 1 / (2*pi * GSD_AMBIENT_BANDWIDTH_HZ), 0.1 Hz.
 #
-# Hysteresis needs no extra machinery: Microsoft's buckets overlap (bucket 1 is
-# 0-6 lux, bucket 2 is 5-14, and so on), and the daemon stays in the bucket it
-# is already in for as long as the reading remains inside that bucket's range.
-# A reading hovering on a boundary therefore cannot flap between two levels.
+# Hysteresis starts from Microsoft's overlapping buckets (bucket 1 is 0-6 lux,
+# bucket 2 is 5-14, and so on): the daemon stays in the bucket it is already in
+# while the reading remains inside that bucket's range, widened by
+# `hysteresis` (10%), because the 200-205 lux overlap alone let a room near
+# 200 lux flap between level 2 and off.
 #
 # Machine-specific notes (ASUS ExpertBook Ultra B9406CAA):
 #
@@ -68,7 +69,7 @@
 
 MODULE_NAME="keyboard-backlight-auto"
 MODULE_DESC="Drive the keyboard backlight from the ambient light sensor (Windows 11 ALR curve)"
-MODULE_VERSION="1.3.1"
+MODULE_VERSION="1.4.0"
 
 MODULE_FILES=(
   "kbd-backlight-auto:/usr/local/bin/kbd-backlight-auto"

@@ -60,13 +60,21 @@ with `GSD_AMBIENT_TIME_CONSTANT = 1 / (2π × GSD_AMBIENT_BANDWIDTH_HZ)` and
 Because the filter is driven by the measured `dt` rather than a fixed step, a
 missed sample doesn't distort it.
 
-### Hysteresis — free, from the overlaps
+### Hysteresis — the overlaps, widened
 
-No extra machinery is needed. Microsoft's buckets **overlap** (bucket 1 is
-0–6 lux, bucket 2 is 5–14, and so on), and the daemon stays in the bucket it
-is already in for as long as the reading remains inside that bucket's range.
-A reading hovering at 5.5 lux therefore cannot flap between 35% and 52% — it
-keeps whichever it entered from.
+Microsoft's buckets **overlap** (bucket 1 is 0–6 lux, bucket 2 is 5–14, and so
+on), and the daemon stays in the bucket it is already in while the reading
+remains inside that bucket's range. At the top of the curve that is not enough:
+buckets 8 and 9 overlap only at 200–205 lux, 2.5%, and an ordinary room near
+200 lux drifts across that every few seconds. On a B9406CAA the smoothed reading
+went 199.4, 205.0, 199.4, 206.3, 199.5, 206.9 lux, and the keyboard switched
+between level 2 and off at each step.
+
+So the current bucket is also kept while the reading stays within
+`hysteresis` (default 0.10, i.e. 10%) beyond its edges. Leaving bucket 8 now
+takes more than 225.5 lux, and coming back from bucket 9 less than 180. The
+curve itself stays Microsoft's, verbatim; `hysteresis = 0` restores the
+overlaps-only behaviour.
 
 ## What this module adds on top
 
@@ -80,6 +88,19 @@ core. Lid handling falls back to `/proc/acpi` while its input device is gone.
 Normal `POLLPRI|POLLERR` notifications from `brightness_hw_changed` still
 deliver Fn-key overrides. Reinstalling the module now restarts the daemon so
 the updated code takes effect immediately.
+
+### Light keycaps, and no flicker at bucket edges (1.4.0)
+
+`curve = light-keycaps` is a curve for white or light keycaps. Their legends
+are readable whenever the room has light, and a white backlight on white
+plastic is glare there, so it follows Apple's inverse relationship instead of
+Microsoft's: level 1 in a dim room, off above 60 lux, back on below 40. With
+the 10% hysteresis that is off above 66 lux and on below 36. Microsoft's table
+peaks at 100% at 40–100 lux, which suits dark keycaps. `curve = microsoft`
+names the default.
+
+The `hysteresis` key above widens every bucket edge, so the default curve no
+longer flickers in a room that sits near 200 lux.
 
 ### Sensor arrives late (1.3.1)
 
@@ -212,7 +233,8 @@ out, and the built-in defaults are the values documented above. Restart with
 | `interval` | `1.0` | Seconds between sensor samples |
 | `bandwidth_hz` | `0.1` | Low-pass filter bandwidth; smaller is smoother, larger reacts faster |
 | `calibration` | `1.0` | Multiplier on the lux reading before the curve is consulted |
-| `curve` | Microsoft's | `<minlux>:<maxlux>:<percent>` triples |
+| `curve` | Microsoft's | `<minlux>:<maxlux>:<percent>` triples, or a preset: `microsoft`, `light-keycaps` |
+| `hysteresis` | `0.10` | How far past a bucket's edge, as a fraction, the reading must go before the level changes; `0` uses the curve's overlaps only |
 | `override_lut` | Microsoft's | `<minlux>:<maxlux>:<lower>:<upper>` 4-tuples |
 | `lid_off` | `yes` | Force the backlight off while the lid is shut |
 

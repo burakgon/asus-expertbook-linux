@@ -187,5 +187,59 @@ class SensorDiscoveryTests(unittest.TestCase):
         find.assert_called_once()
 
 
+
+class CurveTests(unittest.TestCase):
+    # Smoothed readings logged on a B9406CAA in a room near 200 lux, one
+    # morning: Microsoft's 155-205 / 200-300 overlap is 2.5% wide there, and
+    # the keyboard went off and on again with each of these.
+    ROOM_NEAR_200_LUX = [199.4, 205.0, 199.4, 206.3, 199.5, 206.9, 199.0,
+                         205.2, 199.9, 206.2, 196.9, 205.8, 198.9]
+
+    def levels(self, buckets, readings, hysteresis):
+        bucket, out = None, []
+        for lux in readings:
+            bucket = kbd.select_bucket(buckets, lux, bucket, hysteresis)
+            out.append(kbd.pct_to_level(buckets[bucket][2], 3))
+        return out
+
+    def changes(self, levels):
+        return sum(1 for a, b in zip(levels, levels[1:]) if a != b)
+
+    def test_default_curve_flapped_on_the_overlaps_alone(self):
+        buckets = kbd.parse_curve(kbd.DEFAULT_CURVE)
+        self.assertGreaterEqual(
+            self.changes(self.levels(buckets, self.ROOM_NEAR_200_LUX, 0.0)), 8)
+
+    def test_hysteresis_holds_the_level_in_that_room(self):
+        buckets = kbd.parse_curve(kbd.DEFAULT_CURVE)
+        hysteresis = kbd.parse_hysteresis(kbd.DEFAULT_HYSTERESIS)
+        levels = self.levels(buckets, self.ROOM_NEAR_200_LUX, hysteresis)
+        self.assertEqual(self.changes(levels), 0, levels)
+
+    def test_hysteresis_still_follows_a_real_change_of_light(self):
+        buckets = kbd.parse_curve(kbd.DEFAULT_CURVE)
+        levels = self.levels(buckets, [199.0, 300.0, 120.0, 20.0], 0.10)
+        self.assertEqual(levels, [2, 0, 2, 2])
+        self.assertEqual(self.levels(buckets, [3.0], 0.10), [1])
+
+    def test_hysteresis_must_be_a_sane_fraction(self):
+        self.assertEqual(kbd.parse_hysteresis("0"), 0.0)
+        for bad in ("-0.1", "0.8", "lots"):
+            with self.assertRaises(ValueError):
+                kbd.parse_hysteresis(bad)
+
+    def test_light_keycaps_preset_is_dim_when_dark_and_off_in_daylight(self):
+        buckets = kbd.parse_curve(" Light-Keycaps ")
+        self.assertEqual(buckets, kbd.parse_curve(kbd.CURVE_PRESETS["light-keycaps"]))
+        levels = self.levels(buckets, [2.0, 30.0, 55.0, 70.0, 200.0, 500.0, 50.0, 35.0], 0.10)
+        self.assertEqual(levels, [1, 1, 1, 0, 0, 0, 0, 1])
+
+    def test_microsoft_preset_and_explicit_curves_still_parse(self):
+        self.assertEqual(kbd.parse_curve("microsoft"), kbd.parse_curve(kbd.DEFAULT_CURVE))
+        self.assertEqual(kbd.parse_curve("0:10:50, 5:100:0"), [(0.0, 10.0, 50.0), (5.0, 100.0, 0.0)])
+        with self.assertRaises(ValueError):
+            kbd.parse_curve("dark-keycaps")
+
+
 if __name__ == "__main__":
     unittest.main()

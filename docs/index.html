@@ -757,7 +757,7 @@ sudo reboot</code></pre>
   4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
   5   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
-  7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
+  7   keyboard-backlight-auto   1.4.0      1.4.0      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
   9   mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
   10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
@@ -1521,11 +1521,13 @@ intel_ish_ipc 0000:00:12.0: ISH loader: cmd 2 failed 10</code></pre>
             <code>acc = alpha·reading + (1−alpha)·acc</code>, with
             <code>τ = 1/(2π × 0.1 Hz)</code> ≈ <strong>1.6 s</strong>. Driven by the
             measured <code>dt</code>, so a missed sample doesn't distort it.</li>
-          <li><strong>Hysteresis</strong> — free, from Microsoft's
-            <strong>overlapping</strong> buckets (1 is 0–6 lux, 2 is 5–14, …). The
-            daemon stays in the bucket it is in while the reading remains inside
-            that bucket's range, so a reading hovering at 5.5 lux cannot flap
-            between 35% and 52%.</li>
+          <li><strong>Hysteresis</strong> — Microsoft's
+            <strong>overlapping</strong> buckets (1 is 0–6 lux, 2 is 5–14, …),
+            widened by 10% (<code>hysteresis</code>). The daemon stays in the
+            bucket it is in until the reading passes its edge by 10%; the
+            200–205 lux overlap alone let a room near 200 lux flap between level 2
+            and off. <code>curve = light-keycaps</code> suits white keycaps:
+            level 1 when dim, off in normal light.</li>
           <li><strong>Manual override</strong> — Microsoft's lookup table: an Fn
             keypress creates a window around the current reading (at 120 lux,
             <span class="mono">40:150:0.60:0.60</span> gives 48–192 lux) and

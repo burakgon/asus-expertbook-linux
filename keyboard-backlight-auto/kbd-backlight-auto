@@ -67,6 +67,21 @@ DEFAULT_CURVE = (
     "95:110:88, 105:160:70, 155:205:52, 200:300:0"
 )
 
+# Named curves `curve =` also accepts. "light-keycaps" is for white or light
+# keycaps, whose legends ambient light already makes readable: the backlight
+# only comes on in a dim room, at the lowest level, as Apple's inverse curve
+# does, instead of Microsoft's 100% at 40-100 lux.
+CURVE_PRESETS = {
+    "microsoft": DEFAULT_CURVE,
+    "light-keycaps": "0:60:33, 40:100000:0",
+}
+
+# How far, as a fraction of the bucket's own edge, a reading must pass beyond
+# the current bucket before it switches. Microsoft's overlaps alone are too
+# narrow at the top of the curve: 200-205 lux is 2.5%, and a room near 200 lux
+# drifts across that every few seconds.
+DEFAULT_HYSTERESIS = "0.10"
+
 # Microsoft's default manual-override lookup table:
 # "<minlux>:<maxlux>:<lowerboundfactor>:<upperboundfactor>".
 DEFAULT_OVERRIDE_LUT = (
@@ -84,6 +99,7 @@ DEFAULTS = {
     "curve": DEFAULT_CURVE,
     "override_lut": DEFAULT_OVERRIDE_LUT,
     "lid_off": "yes",
+    "hysteresis": DEFAULT_HYSTERESIS,
 }
 
 # linux/input-event-codes.h
@@ -139,7 +155,9 @@ def parse_curve(spec):
     """Parse the ALR curve. Microsoft's validation rules apply: at least one
     bucket, every bucket must have minlux < maxlux, and buckets must be
     contiguous or overlapping (no gaps). Anything else -> ValueError, and the
-    caller falls back to the default curve."""
+    caller falls back to the default curve. A name from CURVE_PRESETS stands
+    for its curve."""
+    spec = CURVE_PRESETS.get(spec.strip().lower(), spec)
     buckets = []
     for part in spec.split(","):
         part = part.strip()
@@ -192,16 +210,25 @@ def parse_override_lut(spec):
 # Curve evaluation
 # --------------------------------------------------------------------------
 
-def select_bucket(buckets, lux, current):
+def parse_hysteresis(spec):
+    """A fraction from 0 (the curve's overlaps only) to 0.5."""
+    value = float(spec)
+    if not 0.0 <= value <= 0.5:
+        raise ValueError("hysteresis %r is not between 0 and 0.5" % spec)
+    return value
+
+
+def select_bucket(buckets, lux, current, hysteresis=0.0):
     """Pick the ALR bucket for `lux`.
 
-    Hysteresis comes for free from the overlapping bucket ranges: as long as
-    the reading is still inside the bucket we are already in, we stay there,
-    so a reading hovering on a boundary cannot flap between two levels.
+    The bucket we are already in is kept while the reading stays inside its
+    range widened by `hysteresis` (a fraction of each edge), on top of the
+    curve's own overlaps, so a reading hovering on a boundary cannot flap
+    between two levels.
     """
     if current is not None:
         lo, hi, _ = buckets[current]
-        if lo <= lux <= hi:
+        if lo * (1.0 - hysteresis) <= lux <= hi * (1.0 + hysteresis):
             return current
     if lux < buckets[0][0]:
         return 0
@@ -414,6 +441,8 @@ class Controller:
         # GNOME: time constant = 1 / (2*pi*bandwidth), in seconds here.
         self.time_constant = 1.0 / (2.0 * math.pi * bandwidth) if bandwidth > 0 else 0.0
         self.lid_off = as_bool(cfg["lid_off"])
+        self.hysteresis = self._parse(
+            parse_hysteresis, cfg["hysteresis"], DEFAULT_HYSTERESIS, "hysteresis")
 
         self.buckets = self._parse(parse_curve, cfg["curve"], DEFAULT_CURVE, "curve")
         self.override_lut = self._parse(
@@ -544,7 +573,7 @@ class Controller:
             self.override = None
             log("%.1f lux | left override window, resuming curve" % lux)
 
-        self.bucket = select_bucket(self.buckets, lux, self.bucket)
+        self.bucket = select_bucket(self.buckets, lux, self.bucket, self.hysteresis)
         pct = self.buckets[self.bucket][2]
         self.apply(pct_to_level(pct, self.backlight.max), lux,
                    "bucket %d (%g-%g lux, %g%%)"
@@ -751,6 +780,8 @@ def print_status(cfg, controller):
     log("fn key devices:   %s" % (", ".join(d["event"] for d in keys) or "none"))
     log("smoothing:        bandwidth %s Hz (time constant %.2f s)"
         % (cfg["bandwidth_hz"], controller.time_constant))
+    log("hysteresis:       %g (a bucket is left %g%% past its edge)"
+        % (controller.hysteresis, controller.hysteresis * 100))
     log("curve (%d buckets, level out of %d):" % (len(controller.buckets), controller.backlight.max))
     for idx, (lo, hi, pct) in enumerate(controller.buckets, 1):
         log("  %d) %7g - %7g lux  ->  %3g%%  ->  level %d"

@@ -153,7 +153,7 @@ typing single letters. Numbered table, color-coded state, cached.
   4   hdr-fix                   1.0.0      1.0.0      up to date     DisplayID 2.0 HDR metadata for KWin
   5   intel-perf-fix            1.3.0      1.3.0      up to date     thermald (+ opt-in intel-lpmd)
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
-  7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
+  7   keyboard-backlight-auto   1.4.0      1.4.0      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
   9   mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
   10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
@@ -625,7 +625,7 @@ exact, numeric, currently-maintained table rather than a prose description.
 | Piece | Where it comes from |
 |---|---|
 | **Smoothing** | GNOME's `gsd-power-manager.c`: `alpha = 1 / (1 + τ/dt)`, `acc = alpha·reading + (1−alpha)·acc`, with `τ = 1/(2π × 0.1 Hz)` ≈ **1.6 s**. Driven by the measured `dt`, so a missed sample doesn't distort it. |
-| **Hysteresis** | Free, from Microsoft's **overlapping** buckets (1 is 0–6 lux, 2 is 5–14, …). The daemon stays in the bucket it is in while the reading remains inside that bucket's range, so a reading hovering at 5.5 lux cannot flap between 35% and 52%. |
+| **Hysteresis** | Microsoft's **overlapping** buckets (1 is 0–6 lux, 2 is 5–14, …), widened by 10% (`hysteresis`). The daemon stays in the bucket it is in until the reading passes that bucket's edge by 10%; the 200–205 lux overlap alone let a room near 200 lux flap between level 2 and off. `curve = light-keycaps` suits white keycaps: level 1 when dim, off in normal light. |
 | **Manual override** | Microsoft's lookup table: an Fn keypress creates a window around the current reading (at 120 lux, `40:150:0.60:0.60` gives 48–192 lux) and autobrightness resumes once the reading leaves it. Detected via `brightness_hw_changed` — see below. |
 | **Lid** | Ours. Lid shut → backlight forced to 0, and any active override is dropped so the curve, not a level chosen in another room, decides on reopen. State comes from the `Lid Switch` evdev device, with `/proc/acpi/button/lid/*/state` as the initial reading and fallback. |
 
