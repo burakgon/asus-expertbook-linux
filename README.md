@@ -155,7 +155,7 @@ typing single letters. Numbered table, color-coded state, cached.
   6   ish-firmware              5.8.1.7783 5.8.1.7783 up to date     ASUS Sensor Hub image (ambient light)
   7   keyboard-backlight-auto   1.3.1      1.3.1      up to date     Ambient-light keyboard backlight
   8   keyboard-backlight-fix    2.0.0      -          not installed  (superseded) asusd workaround
-  9   mute-led-fix              1.2.0      1.2.0      up to date     F1/F4 mute indicator LEDs
+  9   mute-led-fix              1.3.0      1.3.0      up to date     F1/F4 mute indicator LEDs
   10  power-profile-bridge      1.0.0      1.0.0      up to date     Power-saver → SoC low-power + quiet fans
   11  touchpad-fix              1.2.1      1.2.1      up to date     PixArt 093A:4F05 pressure quirk
   12  touchpad-haptics          1.0.0      1.0.0      up to date     Click force + haptic intensity
