@@ -174,7 +174,8 @@ The session service itself has not been tested across suspend/resume.
 Hibernation (CachyOS 7.3.3, swap file on btrfs on LUKS): without the hook,
 both lights came back lit while unmuted, with `platform::mute` and
 `platform::micmute` reading brightness 0 on their audio triggers; toggling
-mute corrected them. The hook has not yet been verified on hardware.
+mute corrected them. With the hook installed, both lights came back in the
+correct state after a hibernation resume.
 
 For contributors, run `python -m unittest discover -s mute-led-fix/tests` for
 the installer, synchronizer and sleep hook tests.
