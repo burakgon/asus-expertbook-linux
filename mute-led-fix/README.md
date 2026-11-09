@@ -119,6 +119,22 @@ separate mute states. F4 reports the default source's mute flag, not a guarantee
 that every microphone is muted. The service does not change routing, hardware
 mute, volume, or keybindings. Zero volume alone is not treated as mute.
 
+### After hibernation
+
+Resuming from hibernation passes through a firmware boot, which lights both
+F1 and F4. The restored kernel still holds the brightness it had before
+hibernating, and the `audio-mute` / `audio-micmute` triggers only write on a
+mute change, so both lights stay lit until mute is next toggled. Ordinary
+suspend is not affected.
+
+The installer adds a systemd-sleep hook,
+`/usr/lib/systemd/system-sleep/expertbook-mute-leds`. After a `hibernate`,
+`hybrid-sleep` or `suspend-then-hibernate` resume it detaches and reattaches
+each LED's audio trigger, which makes the kernel write the current mute
+state to the light. An LED with no trigger has its current brightness
+written back instead. It never changes mute state or volume, and does
+nothing on ordinary suspend.
+
 ## Verify
 
 ```sh
@@ -155,8 +171,13 @@ On the second unit (Hyprland, CachyOS 7.3.0 running, 7.3.0 bore-lto and
 
 The session service itself has not been tested across suspend/resume.
 
+Hibernation (CachyOS 7.3.3, swap file on btrfs on LUKS): without the hook,
+both lights came back lit while unmuted, with `platform::mute` and
+`platform::micmute` reading brightness 0 on their audio triggers; toggling
+mute corrected them. The hook has not yet been verified on hardware.
+
 For contributors, run `python -m unittest discover -s mute-led-fix/tests` for
-the installer and synchronizer tests.
+the installer, synchronizer and sleep hook tests.
 
 ## Uninstall
 

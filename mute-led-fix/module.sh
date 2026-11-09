@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: MIT
 MODULE_NAME="mute-led-fix"
 MODULE_DESC="F1 speaker and F4 microphone mute indicator LEDs"
-MODULE_VERSION="1.2.0"
+MODULE_VERSION="1.3.0"
 
 MODULE_FILES=(
   "b9406-mute-led.conf:/etc/modules-load.d/b9406-mute-led.conf"
   "sync.py:/usr/local/lib/asus-expertbook/mute-led-sync.py"
   "expertbook-mute-leds.service:/etc/systemd/user/expertbook-mute-leds.service"
+  "sleep-hook.sh:/usr/lib/systemd/system-sleep/expertbook-mute-leds"
 )
+MUTE_SLEEP_HOOK=/usr/lib/systemd/system-sleep/expertbook-mute-leds
 
 MUTE_DKMS_NAME=b9406-mute-led
 MUTE_DKMS_VERSION=0.3
@@ -257,6 +259,8 @@ module_install() {
   mute_ensure_dkms
 
   mod_install_files
+  # systemd-sleep only runs executables; mod_install_files writes 0644.
+  chmod 0755 "$MUTE_SLEEP_HOOK"
   # The load entry stays while any installed kernel needs the bridge: on a
   # kernel without the module, systemd-modules-load logs it and carries on.
   if [[ -z $bridge ]]; then
