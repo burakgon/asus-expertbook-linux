@@ -1,14 +1,17 @@
 # Upstream status
 
 Tracking and backport material for the ASUS ExpertBook Ultra B9406CAA: one fix
-already in Linus' tree plus a stable-backport request for it, a display quirk
-patch and issue draft, a libinput quirk, a power-profiles-daemon fix, a
-libdisplay-info memory-safety report, and a packaging request that would make
-`hdr-fix` unnecessary. One proposed audio quirk turned out to be invalid.
+already in Linus' tree plus a stable-backport request for it, an asus-wmi
+keyboard backlight quirk under review, a display quirk patch and issue draft, a
+libinput quirk, a power-profiles-daemon fix, a libdisplay-info memory-safety
+report, and a packaging request that would make `hdr-fix` unnecessary. One
+proposed audio quirk turned out to be invalid.
 
 Status rechecked on 2026-09-28 against `torvalds/linux` 7.3-rc5, the 7.2.8 and
-6.18.54 stable releases and drm-intel-next `a8c17ccf`. Files meant for someone
-else's tracker (`*.md`, `*.txt`) are drafts to be sent by the maintainer.
+6.18.54 stable releases and drm-intel-next `a8c17ccf`; `0006` and the Linux 7.3
+note under `0004` were updated on 2026-11-11 against pdx86 `review-ilpo-next`
+`5680519168f6`. Files meant for someone else's tracker (`*.md`, `*.txt`) are
+drafts to be sent by the maintainer.
 
 ## Accepted upstream
 
@@ -37,6 +40,10 @@ checks the installed `soundwire_intel` module — the one that links
 kernels that lack the upstream quirk and removes the overlay once all installed
 kernels have it. (3.1.0 inspected `soundwire_bus`, which never carries the
 marker.)
+
+Linux 7.3 is now released, and stock 7.3.y kernels bring the card up without
+the overlay: CachyOS 7.3.3 here, and openSUSE Tumbleweed 7.3.1 in
+[#35](https://github.com/burakgon/asus-expertbook-linux/issues/35).
 
 ## Pending or experimental
 
@@ -105,23 +112,41 @@ drm-intel-next for 7.4).
 
 - **Author:** Sercan Gökmen ([#12](https://github.com/burakgon/asus-expertbook-linux/pull/12))
 - **Tree:** `torvalds/linux` → `drivers/platform/x86/asus-wmi.{c,h}`,
-  `drivers/platform/x86/asus-nb-wmi.c`
-- **Where to send:** `platform-driver-x86@vger.kernel.org` (see `MAINTAINERS`,
+  `drivers/platform/x86/asus-nb-wmi.c`. pdx86 moves these files to
+  `drivers/platform/asus/` for the next merge window (`ef696e89f8`, in
+  `review-ilpo-next` since 2026-11-10).
+- **Sent to:** `platform-driver-x86@vger.kernel.org` (see `MAINTAINERS`,
   "ASUS NOTEBOOKS AND EEEPC ACPI/WMI EXTRAS DRIVERS").
 - **Applies to:** master `df2908090cda`, v7.2.3 and pdx86 `for-next`
-  (2026-09-29, with an offset).
+  `c339f4010dea` (with an offset). On `review-ilpo-next` `5680519168f6`, after
+  the move, this file applies only once its paths are rewritten to
+  `drivers/platform/asus/`; the posted v2 carries blob indexes and applies
+  there with `git am -3`.
 - **What it does:** adds a `kbd_led_no_readback` quirk and a DMI entry for the
   B9406CAA, so `kbd_led_get()` returns the driver's cached keyboard backlight
   level instead of overwriting it with the constant 0 the firmware query
   returns on this board. That 0 is why the KDE slider, UPower and
   `brightnessctl` read 0, why `systemd-backlight` restores a dark keyboard,
   and why the first Fn press after any read gives level 1.
-- **Status:** not sent. The DKMS overlay from #12 (a patched copy of the whole
-  `asus-wmi`/`asus-nb-wmi` per kernel series) is not shipped here: it would
-  replace the platform driver that fan profiles, charge limits and
-  `power-profile-bridge` depend on with a snapshot of one stable release.
+- **Status:** under review. v1 was sent on 2026-10-22
+  ([lore](https://lore.kernel.org/r/20261022-b4-asus-wmi-b9406caa-kbd-readback-v1-1-fb33ed98dd16@gmail.com)),
+  v2 on 2026-10-30
+  ([lore](https://lore.kernel.org/r/20261030-b4-asus-wmi-b9406caa-kbd-readback-v2-1-ca93bb9039f6@gmail.com),
+  [patchwork](https://patchwork.kernel.org/project/platform-driver-x86/patch/20261030-b4-asus-wmi-b9406caa-kbd-readback-v2-1-ca93bb9039f6@gmail.com/)).
+  Both make the same code change as the file here; v2 rewrites the commit
+  message, with the subject "platform/x86: asus-wmi: Skip keyboard backlight
+  read-back on B9406CAA", and is based on pdx86 `for-next` `c339f4010dea`. No
+  review replies yet, and not in `review-ilpo-next` as of 2026-11-11.
+- **Related:** a patch for the ROG Strix G814FP
+  ([v3](https://lore.kernel.org/r/20261110-asus-wmi-kbd-readback-v3-1-646adf2b8629@proton.me))
+  adds a `kbd_led_no_wmi` quirk to the same `struct quirk_entry` and DMI
+  table. The two do not depend on each other; whichever lands second needs a
+  trivial rebase.
 - **Local replacement:** none; `keyboard-backlight-auto` only writes the LED
-  and does not need the read-back.
+  and does not need the read-back. The DKMS overlay from #12 (a patched copy
+  of the whole `asus-wmi`/`asus-nb-wmi` per kernel series) is not shipped
+  here: it would replace the platform driver that fan profiles, charge limits
+  and `power-profile-bridge` depend on with a snapshot of one stable release.
 
 ## Drafts for other trackers
 
